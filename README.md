@@ -168,6 +168,28 @@ const result = await sdk.swap(request)
 // for the temporary wallet that received bridged xDAI
 ```
 
+## Examples
+
+The `examples/` directory contains runnable scripts demonstrating common SDK use cases:
+
+| Example | Description |
+|---|---|
+| [`quote-preview.ts`](examples/quote-preview.ts) | Get a cross-chain swap quote without executing — preview costs before committing funds |
+| [`fund-bee-node.ts`](examples/fund-bee-node.ts) | Full funding flow with step-by-step progress callbacks — bridge, swap, and transfer |
+| [`create-batch.ts`](examples/create-batch.ts) | Cross-chain swap + Swarm postage batch creation in one operation (8-step flow) |
+| [`mock-llm-agent.ts`](examples/mock-llm-agent.ts) | Simulated AI agent using tool-calling pattern — works with Claude, OpenAI, LangChain, etc. |
+
+Run any example with:
+
+```bash
+PRIVATE_KEY=0x... npx tsx examples/quote-preview.ts
+PRIVATE_KEY=0x... TARGET_ADDRESS=0x... npx tsx examples/fund-bee-node.ts
+PRIVATE_KEY=0x... TARGET_ADDRESS=0x... npx tsx examples/create-batch.ts
+PRIVATE_KEY=0x... npx tsx examples/mock-llm-agent.ts
+```
+
+Add `MOCKED=true` to run without real blockchain transactions.
+
 ## Development
 
 ```bash
