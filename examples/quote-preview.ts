@@ -2,20 +2,20 @@
  * Quote Preview — Get a cross-chain swap quote without executing
  *
  * This example demonstrates how to use the SDK to preview swap costs
- * before committing any funds. Useful for agents that need to evaluate
- * whether a swap is worth executing.
+ * before committing any funds. No private key or wallet is required —
+ * just specify what you want and see the price.
  *
  * Usage:
- *   PRIVATE_KEY=0x... npx tsx examples/quote-preview.ts
+ *   npx tsx examples/quote-preview.ts
  *
  * Optional env vars:
- *   SOURCE_CHAIN  — Source chain ID (default: 8453 for Base)
+ *   SOURCE_CHAIN   — Source chain ID (default: 8453 for Base)
  *   TARGET_ADDRESS — Gnosis address to receive funds (default: demo address)
- *   BZZ_AMOUNT    — Amount of xBZZ to deliver (default: 10)
- *   NATIVE_AMOUNT — Amount of xDAI to deliver (default: 0.5)
+ *   BZZ_AMOUNT     — Amount of xBZZ to deliver (default: 10)
+ *   NATIVE_AMOUNT  — Amount of xDAI to deliver (default: 0.5)
  */
 
-import { MultichainSDK, EvmPrivateKeyWallet, type SupportedChainId } from '../src/index'
+import { MultichainSDK, type SupportedChainId } from '../src/index'
 
 const CHAIN_NAMES: Record<number, string> = {
   1: 'Ethereum',
@@ -27,13 +27,6 @@ const CHAIN_NAMES: Record<number, string> = {
 
 async function main() {
   // --- Configuration from environment ---
-  const privateKey = process.env.PRIVATE_KEY
-  if (!privateKey) {
-    console.error('Error: PRIVATE_KEY environment variable is required.')
-    console.error('Usage: PRIVATE_KEY=0x... npx tsx examples/quote-preview.ts')
-    process.exit(1)
-  }
-
   const sourceChain = (Number(process.env.SOURCE_CHAIN) || 8453) as SupportedChainId
   const targetAddress = (process.env.TARGET_ADDRESS || '0x1234567890123456789012345678901234567890') as `0x${string}`
   const bzzAmount = Number(process.env.BZZ_AMOUNT) || 10
@@ -41,26 +34,18 @@ async function main() {
 
   // --- Setup ---
   const sdk = new MultichainSDK()
-  const wallet = new EvmPrivateKeyWallet({
-    privateKey: privateKey as `0x${string}`,
-    chainId: sourceChain,
-  })
-
-  const sourceAddress = await wallet.getAddress()
 
   console.log('=== Multichain SDK — Quote Preview ===\n')
-  console.log(`Source wallet:  ${sourceAddress}`)
   console.log(`Source chain:   ${CHAIN_NAMES[sourceChain] || sourceChain} (${sourceChain})`)
   console.log(`Target address: ${targetAddress}`)
   console.log(`BZZ amount:     ${bzzAmount} xBZZ`)
   console.log(`Native amount:  ${nativeAmount} xDAI`)
   console.log('')
 
-  // --- Fetch quote ---
+  // --- Fetch quote (no wallet needed!) ---
   console.log('Fetching quote from Relay Protocol...\n')
 
   const quote = await sdk.getQuote({
-    wallet,
     sourceChain,
     targetAddress,
     bzzAmount,
@@ -78,7 +63,7 @@ async function main() {
   console.log(`Temporary address:     ${quote.temporaryAddress}`)
   console.log('')
   console.log('Quote fetched successfully. No funds were spent.')
-  console.log('To execute this swap, use sdk.executeSwap(quote, wallet)')
+  console.log('To execute this swap, call sdk.executeSwap(quote, wallet)')
 }
 
 main().catch((error) => {

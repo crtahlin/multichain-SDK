@@ -73,9 +73,10 @@ console.log('Batch ID:', result.batchId)
 
 ### 4. Preview costs before executing
 
+No wallet or private key needed — just specify what you want:
+
 ```typescript
 const quote = await sdk.getQuote({
-  wallet,
   sourceChain: 8453,
   targetAddress: '0xBeeNode...',
   bzzAmount: 10,
@@ -218,7 +219,7 @@ The `examples/` directory contains runnable scripts demonstrating common SDK use
 Run any example with:
 
 ```bash
-PRIVATE_KEY=0x... npx tsx examples/quote-preview.ts
+npx tsx examples/quote-preview.ts                                        # No wallet needed
 PRIVATE_KEY=0x... TARGET_ADDRESS=0x... npx tsx examples/fund-bee-node.ts
 PRIVATE_KEY=0x... TARGET_ADDRESS=0x... npx tsx examples/create-batch.ts
 PRIVATE_KEY=0x... npx tsx examples/mock-llm-agent.ts

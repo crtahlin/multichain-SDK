@@ -1,6 +1,7 @@
 export { MultichainSDK } from './MultichainSDK'
 export type {
   EvmWalletAdapter,
+  QuoteRequest,
   SwapRequest,
   BatchRequest,
   SwapQuote,
