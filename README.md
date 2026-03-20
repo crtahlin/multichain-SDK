@@ -89,6 +89,18 @@ console.log(`Estimated: $${quote.estimatedUsdValue.toFixed(2)}`)
 const result = await sdk.executeSwap(quote, wallet)
 ```
 
+### 5. Discover supported chains and tokens
+
+```typescript
+// List supported source chains
+const chains = sdk.getSupportedChains()
+// [{ id: 1, name: 'Ethereum' }, { id: 8453, name: 'Base' }, ...]
+
+// List available tokens on a chain
+const tokens = await sdk.getSupportedTokens(8453)
+// [{ address: '0x...', symbol: 'ETH', name: 'Ether', decimals: 18 }, ...]
+```
+
 ## Supported Chains
 
 | Chain | ID |

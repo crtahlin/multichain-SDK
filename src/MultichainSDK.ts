@@ -7,6 +7,7 @@ import { RelayProvider } from './providers/RelayProvider'
 import type {
   BatchRequest,
   BatchResult,
+  ChainInfo,
   EvmWalletAdapter,
   MultichainSDKOptions,
   QuoteRequest,
@@ -14,6 +15,7 @@ import type {
   SwapQuote,
   SwapRequest,
   SwapResult,
+  TokenInfo,
 } from './types'
 
 /** Dummy address used for Relay quotes when no wallet is provided */
@@ -330,6 +332,46 @@ export class MultichainSDK {
     } catch (error) {
       throw new PriceFetchError('storage price', error instanceof Error ? error : undefined)
     }
+  }
+
+  /**
+   * Get the list of supported source chains.
+   *
+   * @example
+   * ```typescript
+   * const chains = sdk.getSupportedChains()
+   * // [{ id: 1, name: 'Ethereum' }, { id: 137, name: 'Polygon' }, ...]
+   * ```
+   */
+  getSupportedChains(): ChainInfo[] {
+    return Object.entries(SUPPORTED_CHAINS).map(([id, chain]) => ({
+      id: Number(id) as ChainInfo['id'],
+      name: chain.name,
+    }))
+  }
+
+  /**
+   * Get the list of tokens available for swapping on a given source chain.
+   *
+   * Queries the Relay Protocol API for verified tokens. Results include the
+   * native token and popular ERC-20s (USDC, USDT, WETH, etc.).
+   *
+   * @param chainId - Source chain ID (e.g. 8453 for Base)
+   * @throws {ConfigurationError} If the chain ID is not supported
+   *
+   * @example
+   * ```typescript
+   * const tokens = await sdk.getSupportedTokens(8453)
+   * // [{ address: '0x000...', symbol: 'ETH', name: 'Ether', decimals: 18 }, ...]
+   * ```
+   */
+  async getSupportedTokens(chainId: number): Promise<TokenInfo[]> {
+    if (!(chainId in SUPPORTED_CHAINS)) {
+      throw new ConfigurationError(
+        `Unsupported chain: ${chainId}. Supported chains: ${this.getSupportedChains().map(c => `${c.id} (${c.name})`).join(', ')}.`
+      )
+    }
+    return this.relayProvider.getTokens(chainId)
   }
 
   private validateQuoteRequest(request: QuoteRequest): void {

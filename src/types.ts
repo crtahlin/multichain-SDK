@@ -12,6 +12,26 @@ export type SupportedChainId = 1 | 137 | 10 | 42161 | 8453
 /** Status of an individual step in a flow */
 export type StepStatus = 'pending' | 'in-progress' | 'completed' | 'failed' | 'skipped'
 
+/** Summary info for a supported source chain */
+export interface ChainInfo {
+  /** Chain ID (e.g. 8453 for Base) */
+  id: SupportedChainId
+  /** Human-readable chain name (e.g. 'Base') */
+  name: string
+}
+
+/** Summary info for a token available on a source chain */
+export interface TokenInfo {
+  /** Token contract address (null address for native token) */
+  address: string
+  /** Token ticker symbol (e.g. 'ETH', 'USDC') */
+  symbol: string
+  /** Full token name (e.g. 'Ether', 'USD Coin') */
+  name: string
+  /** Token decimals (e.g. 18 for ETH, 6 for USDC) */
+  decimals: number
+}
+
 /**
  * Minimal wallet interface that any EVM wallet provider can implement.
  *
