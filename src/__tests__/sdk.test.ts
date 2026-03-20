@@ -297,6 +297,78 @@ describe('MultichainSDK', () => {
     }, 30000)
   })
 
+  describe('getQuote (wallet-free)', () => {
+    it('works without a wallet', async () => {
+      const sdk = new MultichainSDK()
+
+      const quote = await sdk.getQuote({
+        sourceChain: 8453,
+        targetAddress: '0x1234567890123456789012345678901234567890',
+        bzzAmount: 10,
+        nativeAmount: 0.5,
+      })
+
+      expect(quote.sourceTokenAmount).toBeDefined()
+      expect(quote.estimatedUsdValue).toBeGreaterThan(0)
+      expect(quote.bzzUsdPrice).toBeGreaterThan(0)
+      expect(quote.temporaryAddress).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(quote.temporaryPrivateKey).toMatch(/^0x[0-9a-f]{64}$/)
+    }, 30000)
+
+    it('works with nativeAmount only (no BZZ)', async () => {
+      const sdk = new MultichainSDK()
+
+      const quote = await sdk.getQuote({
+        sourceChain: 8453,
+        targetAddress: '0x1234567890123456789012345678901234567890',
+        nativeAmount: 1.0,
+      })
+
+      expect(quote.sourceTokenAmount).toBeDefined()
+      expect(quote.bzzUsdPrice).toBe(0)
+      expect(quote.bzzUsdValue).toBe(0)
+      expect(quote.nativeAmount).toBe(1.0)
+    }, 30000)
+
+    it('still works when a wallet is provided (backwards compatible)', async () => {
+      const sdk = new MultichainSDK()
+      const wallet = createMockWallet()
+
+      const quote = await sdk.getQuote({
+        wallet,
+        sourceChain: 8453,
+        targetAddress: '0x1234567890123456789012345678901234567890',
+        bzzAmount: 5,
+      })
+
+      expect(quote.sourceTokenAmount).toBeDefined()
+      expect(quote.estimatedUsdValue).toBeGreaterThan(0)
+    }, 30000)
+
+    it('rejects unsupported chain without wallet', async () => {
+      const sdk = new MultichainSDK()
+
+      await expect(
+        sdk.getQuote({
+          sourceChain: 999 as any,
+          targetAddress: '0x1234567890123456789012345678901234567890',
+          bzzAmount: 1,
+        }),
+      ).rejects.toThrow(ConfigurationError)
+    })
+
+    it('rejects zero amounts without wallet', async () => {
+      const sdk = new MultichainSDK()
+
+      await expect(
+        sdk.getQuote({
+          sourceChain: 8453,
+          targetAddress: '0x1234567890123456789012345678901234567890',
+        }),
+      ).rejects.toThrow(ConfigurationError)
+    })
+  })
+
   describe('getBzzPrice', () => {
     it('returns a positive number', async () => {
       const sdk = new MultichainSDK()

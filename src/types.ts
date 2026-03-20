@@ -27,6 +27,36 @@ export interface EvmWalletAdapter {
 }
 
 /**
+ * Request for a price quote — no wallet required.
+ *
+ * Use this with `sdk.getQuote()` to preview costs before committing funds.
+ * At least one of `bzzAmount` or `nativeAmount` must be > 0. Both must be non-negative.
+ *
+ * @example
+ * ```typescript
+ * const quote = await sdk.getQuote({
+ *   sourceChain: 8453,
+ *   targetAddress: '0xBeeNode...',
+ *   bzzAmount: 10,
+ *   nativeAmount: 0.5,
+ * })
+ * console.log(`Cost: $${quote.estimatedUsdValue.toFixed(2)}`)
+ * ```
+ */
+export interface QuoteRequest {
+  /** Source chain ID (1=Ethereum, 137=Polygon, 10=Optimism, 42161=Arbitrum, 8453=Base) */
+  sourceChain: SupportedChainId
+  /** Gnosis address to receive xBZZ and/or xDAI */
+  targetAddress: `0x${string}`
+  /** Amount of xBZZ to deliver (in whole BZZ units, e.g. 10 = 10 BZZ). Defaults to 0. Must be >= 0. */
+  bzzAmount?: number
+  /** Amount of xDAI to deliver (in whole DAI units, e.g. 0.5 = 0.5 xDAI). Defaults to 0. Must be >= 0. */
+  nativeAmount?: number
+  /** Source token address. Defaults to native token (ETH/MATIC/etc.). Most agents leave this unset. */
+  sourceToken?: `0x${string}`
+}
+
+/**
  * Request to swap tokens cross-chain and deliver xBZZ and/or xDAI to a target address on Gnosis.
  *
  * At least one of `bzzAmount` or `nativeAmount` must be > 0. Both must be non-negative.
@@ -39,19 +69,9 @@ export interface EvmWalletAdapter {
  * swaps to xBZZ via SushiSwap if needed, and transfers remaining xDAI to the target.
  * A 10% slippage buffer is included in the bridge amount.
  */
-export interface SwapRequest {
+export interface SwapRequest extends QuoteRequest {
   /** Wallet adapter providing the source funds */
   wallet: EvmWalletAdapter
-  /** Source chain ID (1=Ethereum, 137=Polygon, 10=Optimism, 42161=Arbitrum, 8453=Base) */
-  sourceChain: SupportedChainId
-  /** Gnosis address to receive xBZZ and/or xDAI */
-  targetAddress: `0x${string}`
-  /** Amount of xBZZ to deliver (in whole BZZ units, e.g. 10 = 10 BZZ). Defaults to 0. Must be >= 0. */
-  bzzAmount?: number
-  /** Amount of xDAI to deliver (in whole DAI units, e.g. 0.5 = 0.5 xDAI). Defaults to 0. Must be >= 0. */
-  nativeAmount?: number
-  /** Source token address. Defaults to native token (ETH/MATIC/etc.). Most agents leave this unset. */
-  sourceToken?: `0x${string}`
 }
 
 /**
@@ -106,8 +126,8 @@ export interface SwapQuote {
   temporaryAddress: `0x${string}`
   /** Private key for the temporary address. Save this for fund recovery if the flow fails. */
   temporaryPrivateKey: `0x${string}`
-  /** The original swap request */
-  request: SwapRequest
+  /** The original quote request parameters */
+  request: QuoteRequest
 }
 
 /**

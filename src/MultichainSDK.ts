@@ -9,11 +9,15 @@ import type {
   BatchResult,
   EvmWalletAdapter,
   MultichainSDKOptions,
+  QuoteRequest,
   SwapCallbacks,
   SwapQuote,
   SwapRequest,
   SwapResult,
 } from './types'
+
+/** Dummy address used for Relay quotes when no wallet is provided */
+const DUMMY_SOURCE_ADDRESS = '0x0000000000000000000000000000000000000001' as `0x${string}`
 
 /**
  * Main SDK class for cross-chain swaps to Gnosis and Swarm postage batch creation.
@@ -52,18 +56,30 @@ export class MultichainSDK {
   /**
    * Get a quote for a cross-chain swap without executing it.
    *
-   * Use this to preview costs before committing funds. The quote includes
-   * the estimated source token amount, USD value, and a temporary Gnosis address.
-   * Quotes are time-sensitive — execute promptly via `executeSwap()`.
+   * No wallet or private key is required — just specify the source chain, amounts,
+   * and target address to get a price estimate. To execute the quote, pass it to
+   * `executeSwap()` with a wallet.
    *
    * For a simpler one-step flow, use `swap()` instead.
+   *
+   * @example
+   * ```typescript
+   * // Wallet-free quote (just a price check)
+   * const quote = await sdk.getQuote({
+   *   sourceChain: 8453,
+   *   targetAddress: '0xBeeNode...',
+   *   bzzAmount: 10,
+   *   nativeAmount: 0.5,
+   * })
+   * console.log(`Cost: $${quote.estimatedUsdValue.toFixed(2)}`)
+   * ```
    *
    * @throws {ConfigurationError} If the source chain is unsupported or amounts are invalid
    * @throws {PriceFetchError} If the BZZ price API is unavailable
    * @throws {NoRouteError} If Relay Protocol finds no route for the swap
    */
-  async getQuote(request: SwapRequest): Promise<SwapQuote> {
-    this.validateRequest(request)
+  async getQuote(request: QuoteRequest): Promise<SwapQuote> {
+    this.validateQuoteRequest(request)
 
     const bzzAmount = request.bzzAmount ?? 0
     const nativeAmount = request.nativeAmount ?? 0
@@ -85,7 +101,9 @@ export class MultichainSDK {
     const totalNeededUsdValue = (bzzUsdValue + nativeAmount + daiDust) * 1.1
 
     const { temporaryPrivateKey, temporaryAddress } = this.generateTemporaryWallet()
-    const sourceAddress = await request.wallet.getAddress()
+    const sourceAddress = 'wallet' in request
+      ? await (request as SwapRequest).wallet.getAddress()
+      : DUMMY_SOURCE_ADDRESS
 
     const { relayQuote, sourceTokenAmount, totalDaiValue } = await this.relayProvider.getQuote({
       sourceAddress,
@@ -182,6 +200,7 @@ export class MultichainSDK {
    * @throws {NoRouteError} If Relay Protocol finds no route for the swap
    */
   async swap(request: SwapRequest, callbacks?: SwapCallbacks): Promise<SwapResult> {
+    this.validateSwapAmounts(request)
     const quote = await this.getQuote(request)
     return this.executeSwap(quote, request.wallet, callbacks)
   }
@@ -198,7 +217,7 @@ export class MultichainSDK {
    * @throws {NoRouteError} If Relay Protocol finds no route for the swap
    */
   async createBatch(request: BatchRequest, callbacks?: SwapCallbacks): Promise<BatchResult> {
-    this.validateRequest(request)
+    this.validateChainAndAmountSigns(request)
 
     const sourceToken = request.sourceToken ?? this.library.constants.nullAddress
 
@@ -313,7 +332,7 @@ export class MultichainSDK {
     }
   }
 
-  private validateRequest(request: SwapRequest): void {
+  private validateQuoteRequest(request: QuoteRequest): void {
     if (!(request.sourceChain in SUPPORTED_CHAINS)) {
       throw new ConfigurationError(
         `Unsupported source chain: ${request.sourceChain}. Supported chains: 1 (Ethereum), 137 (Polygon), 10 (Optimism), 42161 (Arbitrum), 8453 (Base).`
@@ -330,15 +349,28 @@ export class MultichainSDK {
       throw new ConfigurationError('nativeAmount cannot be negative.')
     }
 
-    if ('batchDepth' in request) {
-      // BatchRequest — amounts are calculated from batch params, skip amount check
-      return
-    }
-
     if (bzzAmount <= 0 && nativeAmount <= 0) {
       throw new ConfigurationError(
         'At least one of bzzAmount or nativeAmount must be greater than 0.'
       )
+    }
+  }
+
+  private validateSwapAmounts(request: SwapRequest): void {
+    this.validateQuoteRequest(request)
+  }
+
+  private validateChainAndAmountSigns(request: QuoteRequest): void {
+    if (!(request.sourceChain in SUPPORTED_CHAINS)) {
+      throw new ConfigurationError(
+        `Unsupported source chain: ${request.sourceChain}. Supported chains: 1 (Ethereum), 137 (Polygon), 10 (Optimism), 42161 (Arbitrum), 8453 (Base).`
+      )
+    }
+    if ((request.bzzAmount ?? 0) < 0) {
+      throw new ConfigurationError('bzzAmount cannot be negative.')
+    }
+    if ((request.nativeAmount ?? 0) < 0) {
+      throw new ConfigurationError('nativeAmount cannot be negative.')
     }
   }
 
