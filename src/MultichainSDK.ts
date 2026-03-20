@@ -284,6 +284,13 @@ export class MultichainSDK {
     const bzzAmount = request.bzzAmount ?? 0
     const nativeAmount = request.nativeAmount ?? 0
 
+    if (bzzAmount < 0) {
+      throw new ConfigurationError('bzzAmount cannot be negative.')
+    }
+    if (nativeAmount < 0) {
+      throw new ConfigurationError('nativeAmount cannot be negative.')
+    }
+
     if ('batchDepth' in request) {
       // BatchRequest — amounts are calculated from batch params, skip amount check
       return

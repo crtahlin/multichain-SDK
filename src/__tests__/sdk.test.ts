@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MultichainSDK } from '../MultichainSDK'
-import { ConfigurationError } from '../errors'
+import { ConfigurationError, PriceFetchError } from '../errors'
 import type { EvmWalletAdapter, StepStatus } from '../types'
 
 function createMockWallet(): EvmWalletAdapter {
@@ -229,5 +229,263 @@ describe('MultichainSDK', () => {
         }),
       ).rejects.toThrow(ConfigurationError)
     })
+
+    it('rejects negative bzzAmount', async () => {
+      const sdk = new MultichainSDK({ mocked: true })
+      const wallet = createMockWallet()
+
+      await expect(
+        sdk.swap({
+          wallet,
+          sourceChain: 8453,
+          targetAddress: '0x1234567890123456789012345678901234567890',
+          bzzAmount: -5,
+          nativeAmount: 0,
+        }),
+      ).rejects.toThrow(ConfigurationError)
+    })
+
+    it('rejects negative nativeAmount', async () => {
+      const sdk = new MultichainSDK({ mocked: true })
+      const wallet = createMockWallet()
+
+      await expect(
+        sdk.swap({
+          wallet,
+          sourceChain: 8453,
+          targetAddress: '0x1234567890123456789012345678901234567890',
+          bzzAmount: 0,
+          nativeAmount: -1,
+        }),
+      ).rejects.toThrow(ConfigurationError)
+    })
+
+    it('error message lists supported chains', async () => {
+      const sdk = new MultichainSDK({ mocked: true })
+      const wallet = createMockWallet()
+
+      try {
+        await sdk.swap({
+          wallet,
+          sourceChain: 56 as any,
+          targetAddress: '0x1234567890123456789012345678901234567890',
+          bzzAmount: 1,
+        })
+        expect.fail('should have thrown')
+      } catch (error: any) {
+        expect(error).toBeInstanceOf(ConfigurationError)
+        expect(error.message).toContain('8453')
+        expect(error.message).toContain('Base')
+      }
+    })
+
+    it('createBatch skips amount validation (amounts derived from batch params)', async () => {
+      const sdk = new MultichainSDK({ mocked: true })
+      const wallet = createMockWallet()
+
+      // batchRequest can have bzzAmount=0, nativeAmount=0 because
+      // the SDK calculates needed BZZ from batchDepth/batchDurationDays
+      const result = await sdk.createBatch({
+        wallet,
+        sourceChain: 8453,
+        targetAddress: '0x1234567890123456789012345678901234567890',
+        batchDepth: 17,
+        batchDurationDays: 1,
+      })
+
+      expect(result.batchId).toBeDefined()
+    }, 30000)
+  })
+
+  describe('getBzzPrice', () => {
+    it('returns a positive number', async () => {
+      const sdk = new MultichainSDK()
+      const price = await sdk.getBzzPrice()
+      expect(typeof price).toBe('number')
+      expect(price).toBeGreaterThan(0)
+    }, 30000)
+
+    it('returns a reasonable price (< $1000)', async () => {
+      const sdk = new MultichainSDK()
+      const price = await sdk.getBzzPrice()
+      expect(price).toBeLessThan(1000)
+    }, 30000)
+  })
+
+  describe('getStoragePrice', () => {
+    it('returns a bigint', async () => {
+      const sdk = new MultichainSDK()
+      const price = await sdk.getStoragePrice()
+      expect(typeof price).toBe('bigint')
+    }, 30000)
+
+    it('returns a positive value', async () => {
+      const sdk = new MultichainSDK()
+      const price = await sdk.getStoragePrice()
+      expect(price).toBeGreaterThan(0n)
+    }, 30000)
+  })
+
+  describe('callback coverage (mocked)', () => {
+    it('onStepChange receives all 6 step names for swap', async () => {
+      const sdk = new MultichainSDK({ mocked: true })
+      const wallet = createMockWallet()
+      const seenSteps = new Set<string>()
+
+      await sdk.swap(
+        {
+          wallet,
+          sourceChain: 8453,
+          targetAddress: '0x1234567890123456789012345678901234567890',
+          bzzAmount: 1,
+        },
+        {
+          onStepChange: (steps) => {
+            for (const name of Object.keys(steps)) {
+              seenSteps.add(name)
+            }
+          },
+        },
+      )
+
+      expect(seenSteps).toContain('relay')
+      expect(seenSteps).toContain('relay-sync')
+      expect(seenSteps).toContain('sushi')
+      expect(seenSteps).toContain('sushi-sync')
+      expect(seenSteps).toContain('transfer')
+      expect(seenSteps).toContain('transfer-sync')
+    }, 30000)
+
+    it('onStepChange receives all 8 step names for createBatch', async () => {
+      const sdk = new MultichainSDK({ mocked: true })
+      const wallet = createMockWallet()
+      const seenSteps = new Set<string>()
+
+      await sdk.createBatch(
+        {
+          wallet,
+          sourceChain: 8453,
+          targetAddress: '0x1234567890123456789012345678901234567890',
+          batchDepth: 20,
+          batchDurationDays: 30,
+        },
+        {
+          onStepChange: (steps) => {
+            for (const name of Object.keys(steps)) {
+              seenSteps.add(name)
+            }
+          },
+        },
+      )
+
+      expect(seenSteps).toContain('relay')
+      expect(seenSteps).toContain('relay-sync')
+      expect(seenSteps).toContain('sushi')
+      expect(seenSteps).toContain('sushi-sync')
+      expect(seenSteps).toContain('approve-bzz')
+      expect(seenSteps).toContain('create-batch')
+      expect(seenSteps).toContain('transfer')
+      expect(seenSteps).toContain('transfer-sync')
+    }, 30000)
+
+    it('onStatusChange transitions through in-progress to completed for swap', async () => {
+      const sdk = new MultichainSDK({ mocked: true })
+      const wallet = createMockWallet()
+      const statuses: string[] = []
+
+      await sdk.swap(
+        {
+          wallet,
+          sourceChain: 8453,
+          targetAddress: '0x1234567890123456789012345678901234567890',
+          nativeAmount: 1,
+        },
+        {
+          onStatusChange: (status) => { statuses.push(status) },
+        },
+      )
+
+      expect(statuses.indexOf('in-progress')).toBeLessThan(statuses.indexOf('completed'))
+    }, 30000)
+
+    it('onBatchCreated receives correct batch data', async () => {
+      const sdk = new MultichainSDK({ mocked: true })
+      const wallet = createMockWallet()
+      let batchData: any = null
+
+      await sdk.createBatch(
+        {
+          wallet,
+          sourceChain: 8453,
+          targetAddress: '0x1234567890123456789012345678901234567890',
+          batchDepth: 18,
+          batchDurationDays: 7,
+        },
+        {
+          onBatchCreated: (data) => { batchData = data },
+        },
+      )
+
+      expect(batchData).not.toBeNull()
+      expect(batchData.batchId).toMatch(/^0x[0-9a-f]{64}$/)
+      expect(batchData.depth).toBe(18)
+      expect(typeof batchData.amount).toBe('string')
+      expect(typeof batchData.blockNumber).toBe('string')
+    }, 30000)
+
+    it('swap works with no callbacks at all', async () => {
+      const sdk = new MultichainSDK({ mocked: true })
+      const wallet = createMockWallet()
+
+      const result = await sdk.swap({
+        wallet,
+        sourceChain: 8453,
+        targetAddress: '0x1234567890123456789012345678901234567890',
+        bzzAmount: 1,
+      })
+
+      expect(result.steps).toBeDefined()
+      expect(result.temporaryPrivateKey).toMatch(/^0x[0-9a-f]{64}$/)
+    }, 30000)
+
+    it('createBatch works with no callbacks at all', async () => {
+      const sdk = new MultichainSDK({ mocked: true })
+      const wallet = createMockWallet()
+
+      const result = await sdk.createBatch({
+        wallet,
+        sourceChain: 8453,
+        targetAddress: '0x1234567890123456789012345678901234567890',
+        batchDepth: 20,
+        batchDurationDays: 30,
+      })
+
+      expect(result.batchId).toMatch(/^0x[0-9a-f]{64}$/)
+    }, 30000)
+  })
+
+  describe('concurrent calls', () => {
+    it('concurrent swaps generate unique temporary wallets', async () => {
+      const sdk = new MultichainSDK({ mocked: true })
+      const wallet = createMockWallet()
+      const request = {
+        wallet,
+        sourceChain: 8453 as const,
+        targetAddress: '0x1234567890123456789012345678901234567890' as `0x${string}`,
+        bzzAmount: 1,
+      }
+
+      const [r1, r2, r3] = await Promise.all([
+        sdk.swap(request),
+        sdk.swap(request),
+        sdk.swap(request),
+      ])
+
+      const keys = new Set([r1.temporaryPrivateKey, r2.temporaryPrivateKey, r3.temporaryPrivateKey])
+      expect(keys.size).toBe(3)
+
+      const addrs = new Set([r1.temporaryAddress, r2.temporaryAddress, r3.temporaryAddress])
+      expect(addrs.size).toBe(3)
+    }, 60000)
   })
 })
