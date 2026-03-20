@@ -128,7 +128,11 @@ Both use cases work by bridging tokens from a source chain (Ethereum, Base, Poly
 
 ## Integration with swarm_mcp
 
-If the user also has the swarm_mcp server configured, you can use it to find the Bee node's address and to upload files after renting storage.`,
+If the user also has the swarm_mcp server configured, you can use it to find the Bee node's address and to upload files after renting storage.
+
+## Note for agent frameworks
+
+In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment variables like PRIVATE_KEY and SOURCE_CHAIN are typically set at the process level and shared automatically across all MCP servers. The per-server \`env\` block in Claude Desktop config is only needed for desktop usage — agent frameworks don't require duplicating keys.`,
     },
   )
 

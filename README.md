@@ -272,6 +272,8 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 
 Tools marked "Wallet needed" require `PRIVATE_KEY` and `SOURCE_CHAIN` environment variables. Read-only tools work without credentials.
 
+> **Agent frameworks (LangChain, CrewAI, Vercel AI SDK, etc.):** Environment variables set at the process level are shared automatically across all MCP servers — no need to duplicate keys in per-server config blocks. The `env` block above is only needed for Claude Desktop.
+
 ## Examples
 
 The `examples/` directory contains runnable scripts demonstrating common SDK use cases:
