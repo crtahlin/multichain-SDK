@@ -29,8 +29,8 @@ async function main() {
   // --- Configuration from environment ---
   const sourceChain = (Number(process.env.SOURCE_CHAIN) || 8453) as SupportedChainId
   const targetAddress = (process.env.TARGET_ADDRESS || '0x1234567890123456789012345678901234567890') as `0x${string}`
-  const bzzAmount = Number(process.env.BZZ_AMOUNT) || 10
-  const nativeAmount = Number(process.env.NATIVE_AMOUNT) || 0.5
+  const bzzAmount = process.env.BZZ_AMOUNT !== undefined ? Number(process.env.BZZ_AMOUNT) : 10
+  const nativeAmount = process.env.NATIVE_AMOUNT !== undefined ? Number(process.env.NATIVE_AMOUNT) : 0.5
 
   // --- Setup ---
   const sdk = new MultichainSDK()
