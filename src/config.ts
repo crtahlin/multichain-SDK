@@ -39,20 +39,35 @@ export function getExplorerTxUrl(chainId: number, txHash: string): string {
   return `${base}/tx/${txHash}`
 }
 
-/** Get Relay Protocol chain configurations */
+/**
+ * Convert supported chains to Relay Protocol format.
+ * Used internally by RelayProvider to initialize the Relay SDK client.
+ */
 export function getRelayChains() {
   return [mainnet, polygon, optimism, arbitrum, base, gnosis].map(convertViemChainToRelayChain)
 }
 
 /** Stamp cost calculation result */
 export interface StampCost {
+  /** Total BZZ cost as a FixedPointNumber (16 decimals, matching xBZZ on Gnosis) */
   bzz: FixedPointNumber
+  /** Per-chunk amount parameter for the postage stamp contract */
   amount: bigint
 }
 
 /**
- * Calculate the cost of a postage batch.
- * Adapted from widget's Utility.ts.
+ * Calculate the cost of a Swarm postage batch.
+ *
+ * Formula: `amount = (days * 86400 / 5) * storagePrice + 1`
+ * where 86400/5 = 17280 blocks per day (5-second block time on Gnosis).
+ * The `+1` ensures the amount is always at least 1 above the minimum.
+ *
+ * Total BZZ cost: `2^depth * amount` (in 16-decimal fixed point).
+ *
+ * @param depth - Batch depth (17–24). Higher = more storage capacity.
+ * @param days - Batch duration in days.
+ * @param storagePrice - Current storage price from `sdk.getStoragePrice()`.
+ * @returns The BZZ cost and per-chunk amount for the postage stamp contract.
  */
 export function getStampCost(depth: number, days: number, storagePrice: bigint): StampCost {
   const amount = (BigInt(days * 86_400) / BigInt(5)) * storagePrice + 1n
