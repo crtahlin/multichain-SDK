@@ -227,10 +227,12 @@ The `examples/` directory contains runnable scripts demonstrating common SDK use
 | [`fund-bee-node.ts`](examples/fund-bee-node.ts) | Full funding flow with step-by-step progress callbacks — bridge, swap, and transfer |
 | [`create-batch.ts`](examples/create-batch.ts) | Cross-chain swap + Swarm postage batch creation in one operation (8-step flow) |
 | [`mock-llm-agent.ts`](examples/mock-llm-agent.ts) | Simulated AI agent using tool-calling pattern — works with Claude, OpenAI, LangChain, etc. |
+| [`discover-chains-tokens.ts`](examples/discover-chains-tokens.ts) | List supported chains, find tokens on a chain, and get a quote paying with USDC |
 
 Run any example with:
 
 ```bash
+npx tsx examples/discover-chains-tokens.ts                               # No wallet needed
 npx tsx examples/quote-preview.ts                                        # No wallet needed
 PRIVATE_KEY=0x... TARGET_ADDRESS=0x... npx tsx examples/fund-bee-node.ts
 PRIVATE_KEY=0x... TARGET_ADDRESS=0x... npx tsx examples/create-batch.ts
