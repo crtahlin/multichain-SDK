@@ -21,18 +21,19 @@ No funding wallet configured. A funding wallet is needed to pay for cross-chain 
 IMPORTANT: The funding wallet is the wallet that holds the tokens you want to spend (e.g. ETH or USDC on Base). \
 This is NOT your Bee node's key — your Bee node has its own separate wallet for Gnosis chain operations.
 
-To configure your funding wallet, add PRIVATE_KEY and SOURCE_CHAIN to your MCP server settings.
+To configure your funding wallet, add PRIVATE_KEY to your MCP server settings. \
+SOURCE_CHAIN is optional — if set, it becomes the default source chain; otherwise, you specify the chain in each tool call.
 
 - PRIVATE_KEY: The private key of the wallet holding your funds (e.g. ETH on Base)
-- SOURCE_CHAIN: Which blockchain your funds are on (e.g. 8453 for Base)
+- SOURCE_CHAIN (optional): Default blockchain for your funds (e.g. 8453 for Base)
 
 Example for Claude Desktop (~/Library/Application Support/Claude/claude_desktop_config.json):
 
 {
   "mcpServers": {
     "multichain": {
-      "command": "npx",
-      "args": ["@multichain-dev/multichain-sdk-mcp"],
+      "command": "node",
+      "args": ["/absolute/path/to/multichain-SDK/dist/mcp/cli.js"],
       "env": {
         "PRIVATE_KEY": "0xYourFundingWalletPrivateKey",
         "SOURCE_CHAIN": "8453"
@@ -47,23 +48,28 @@ Tip: You can check your funding wallet balance on a block explorer (e.g. basesca
 
 After updating the config, restart your MCP client (e.g. Claude Desktop) for changes to take effect.`
 
-function getWallet(): EvmPrivateKeyWallet {
+function getWallet(chainIdOverride?: number): EvmPrivateKeyWallet {
   const privateKey = process.env.PRIVATE_KEY
   if (!privateKey) {
     throw new Error(WALLET_SETUP_INSTRUCTIONS)
   }
 
-  const sourceChainStr = process.env.SOURCE_CHAIN
-  if (!sourceChainStr) {
+  const chainId = chainIdOverride ?? (process.env.SOURCE_CHAIN ? parseInt(process.env.SOURCE_CHAIN, 10) : undefined)
+  if (!chainId) {
     throw new Error(
-      'SOURCE_CHAIN environment variable is not set. This tells the SDK which blockchain your funds are on.\n\n' + WALLET_SETUP_INSTRUCTIONS
+      'No source chain specified. Either set SOURCE_CHAIN in your MCP server config, or provide sourceChain in the tool call.'
     )
   }
 
-  const chainId = parseInt(sourceChainStr, 10) as SupportedChainId
+  if (!SUPPORTED_CHAINS[chainId as SupportedChainId]) {
+    throw new Error(
+      `Chain ${chainId} is not supported. Supported chains: 1 (Ethereum), 137 (Polygon), 10 (Optimism), 42161 (Arbitrum), 8453 (Base).`
+    )
+  }
+
   return new EvmPrivateKeyWallet({
     privateKey: privateKey as `0x${string}`,
-    chainId,
+    chainId: chainId as SupportedChainId,
   })
 }
 
@@ -109,7 +115,7 @@ Both use cases work by bridging tokens from a source chain (Ethereum, Base, Poly
 
 ## Key concepts
 
-- **Funding wallet** = the wallet with ETH/USDC/etc. that pays for everything (configured via PRIVATE_KEY env var — NOT the Bee node's key)
+- **Funding wallet** = the wallet with ETH/USDC/etc. that pays for everything (configured via PRIVATE_KEY env var — NOT the Bee node's key). SOURCE_CHAIN is optional — if set, it's the default; otherwise, specify the chain in each tool call
 - **Bee node address** = your Bee node's Gnosis chain address that receives xBZZ/xDAI. Find it via the Bee API (\`/addresses\` endpoint) or the swarm_mcp server
 - **xBZZ** = Swarm's storage currency on Gnosis chain
 - **xDAI** = Gnosis chain's native token, needed for transaction fees
@@ -142,7 +148,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
     {
       title: 'Check Wallet Configuration',
       description:
-        'Check whether a funding wallet is configured and show its address, chain, and native token balance. ' +
+        'Check whether a funding wallet is configured and show its address, default chain, and native token balance. ' +
         'Use this first to verify the setup before attempting any transactions. ' +
         'Note: the funding wallet is NOT the Bee node — it\'s the wallet that pays for swaps.',
     },
@@ -173,11 +179,10 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
 
       if (!sourceChainStr) {
         return jsonResult({
-          configured: false,
+          configured: true,
           fundingAddress: address,
-          message: 'Funding wallet key is set, but SOURCE_CHAIN is missing. Set it to the chain ID where your funds are (e.g. 8453 for Base).',
-          missingVariables: ['SOURCE_CHAIN'],
-          setupInstructions: WALLET_SETUP_INSTRUCTIONS,
+          sourceChain: null,
+          note: 'This is the funding wallet address — NOT the Bee node address. No default SOURCE_CHAIN is set, so you must specify sourceChain in each tool call. Use multichain_wallet_balance to see where your funds are.',
         })
       }
 
@@ -410,19 +415,13 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
       description:
         'Execute a previously previewed swap. The quoteId comes from multichain_get_quote. ' +
         'Each quote can only be used once and expires after 5 minutes. ' +
-        'Requires a configured funding wallet — use multichain_wallet_status to check.',
+        'The source chain is determined by the quote — no need to specify it again. ' +
+        'Requires a configured funding wallet (PRIVATE_KEY) — use multichain_wallet_status to check.',
       inputSchema: {
         quoteId: z.string().describe('Quote ID from multichain_get_quote'),
       },
     },
     async ({ quoteId }) => {
-      let wallet
-      try {
-        wallet = getWallet()
-      } catch (error: unknown) {
-        return errorResult(error instanceof Error ? error.message : String(error))
-      }
-
       const stored = quoteStore.get(quoteId)
       if (!stored) {
         return errorResult(`Quote "${quoteId}" not found. It may have been used already or never existed.`)
@@ -431,6 +430,13 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
       if (Date.now() > stored.expiresAt) {
         quoteStore.delete(quoteId)
         return errorResult('Quote has expired. Please request a new quote with multichain_get_quote.')
+      }
+
+      let wallet
+      try {
+        wallet = getWallet(stored.quote.request.sourceChain)
+      } catch (error: unknown) {
+        return errorResult(error instanceof Error ? error.message : String(error))
       }
 
       // Consume quote (single use)
@@ -472,7 +478,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
     async ({ sourceChain, targetAddress, bzzAmount, nativeAmount, sourceToken }) => {
       let wallet
       try {
-        wallet = getWallet()
+        wallet = getWallet(sourceChain)
       } catch (error: unknown) {
         return errorResult(error instanceof Error ? error.message : String(error))
       }
@@ -521,7 +527,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
     async ({ sourceChain, targetAddress, batchDepth, batchDurationDays, nativeAmount }) => {
       let wallet
       try {
-        wallet = getWallet()
+        wallet = getWallet(sourceChain)
       } catch (error: unknown) {
         return errorResult(error instanceof Error ? error.message : String(error))
       }

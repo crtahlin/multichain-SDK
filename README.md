@@ -244,8 +244,8 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 {
   "mcpServers": {
     "multichain": {
-      "command": "npx",
-      "args": ["@multichain-dev/multichain-sdk-mcp"],
+      "command": "node",
+      "args": ["/absolute/path/to/multichain-SDK/dist/mcp/cli.js"],
       "env": {
         "PRIVATE_KEY": "0x...",
         "SOURCE_CHAIN": "8453"
@@ -254,6 +254,8 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
   }
 }
 ```
+
+`SOURCE_CHAIN` is optional — if set, it's the default source chain. You can override it per tool call by specifying `sourceChain`.
 
 ### Available Tools
 

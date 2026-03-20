@@ -92,7 +92,6 @@ describe('MCP Server', () => {
       const data = JSON.parse(content[0].text)
       expect(data.configured).toBe(false)
       expect(data.missingVariables).toContain('PRIVATE_KEY')
-      expect(data.missingVariables).toContain('SOURCE_CHAIN')
 
       if (originalKey) process.env.PRIVATE_KEY = originalKey
       if (originalChain) process.env.SOURCE_CHAIN = originalChain
@@ -124,7 +123,7 @@ describe('MCP Server', () => {
       else delete process.env.SOURCE_CHAIN
     }, 15000)
 
-    it('returns configured: false with address when only SOURCE_CHAIN is missing', async () => {
+    it('returns configured: true without default chain when only SOURCE_CHAIN is missing', async () => {
       const originalKey = process.env.PRIVATE_KEY
       const originalChain = process.env.SOURCE_CHAIN
       process.env.PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -133,10 +132,10 @@ describe('MCP Server', () => {
       const result = await client.callTool({ name: 'multichain_wallet_status' })
       const content = result.content as Array<{ type: string; text: string }>
       const data = JSON.parse(content[0].text)
-      expect(data.configured).toBe(false)
+      expect(data.configured).toBe(true)
       expect(data.fundingAddress).toMatch(/^0x/)
-      expect(data.missingVariables).toContain('SOURCE_CHAIN')
-      expect(data.missingVariables).not.toContain('PRIVATE_KEY')
+      expect(data.sourceChain).toBeNull()
+      expect(data.note).toContain('No default SOURCE_CHAIN')
 
       if (originalKey) process.env.PRIVATE_KEY = originalKey
       else delete process.env.PRIVATE_KEY
@@ -297,10 +296,11 @@ describe('MCP Server', () => {
   })
 
   describe('wallet-requiring tools (error without PRIVATE_KEY)', () => {
-    it('multichain_execute_swap returns error without PRIVATE_KEY', async () => {
+    it('multichain_execute_swap returns not-found without PRIVATE_KEY (quote checked first)', async () => {
       const originalKey = process.env.PRIVATE_KEY
       delete process.env.PRIVATE_KEY
 
+      // execute_swap now checks the quote before creating the wallet
       const result = await client.callTool({
         name: 'multichain_execute_swap',
         arguments: { quoteId: 'nonexistent' },
@@ -309,9 +309,7 @@ describe('MCP Server', () => {
       expect(result.isError).toBe(true)
       const content = result.content as Array<{ type: string; text: string }>
       const data = JSON.parse(content[0].text)
-      expect(data.error).toContain('funding wallet')
-      expect(data.error).toContain('NOT')
-      expect(data.error).toContain('Bee node')
+      expect(data.error).toContain('not found')
 
       if (originalKey) process.env.PRIVATE_KEY = originalKey
     })
@@ -404,12 +402,14 @@ describe('MCP Server', () => {
       else delete process.env.SOURCE_CHAIN
     })
 
-    it('multichain_execute_swap returns SOURCE_CHAIN error when only PRIVATE_KEY is set', async () => {
+    it('multichain_execute_swap returns not-found for nonexistent quote without SOURCE_CHAIN', async () => {
       const originalKey = process.env.PRIVATE_KEY
       const originalChain = process.env.SOURCE_CHAIN
       process.env.PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
       delete process.env.SOURCE_CHAIN
 
+      // execute_swap gets chain from the stored quote, not SOURCE_CHAIN
+      // so with a nonexistent quoteId, it fails with "not found" (not a chain error)
       const result = await client.callTool({
         name: 'multichain_execute_swap',
         arguments: { quoteId: 'test' },
@@ -418,7 +418,7 @@ describe('MCP Server', () => {
       expect(result.isError).toBe(true)
       const content = result.content as Array<{ type: string; text: string }>
       const data = JSON.parse(content[0].text)
-      expect(data.error).toContain('SOURCE_CHAIN')
+      expect(data.error).toContain('not found')
 
       // Restore env
       if (originalKey) process.env.PRIVATE_KEY = originalKey
