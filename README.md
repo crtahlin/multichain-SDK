@@ -6,8 +6,23 @@ Headless Node.js SDK that enables AI agents to perform cross-chain token swaps t
 
 ## Installation
 
+This package is not yet published to npm. Install from GitHub:
+
 ```bash
-pnpm add @multichain-dev/multichain-sdk
+git clone https://github.com/crtahlin/multichain-SDK.git
+cd multichain-SDK
+pnpm install
+pnpm build
+```
+
+To use it as a dependency in another project, link it locally:
+
+```bash
+# In the multichain-SDK directory
+pnpm link --global
+
+# In your project
+pnpm link --global @multichain-dev/multichain-sdk
 ```
 
 ## Quick Start
