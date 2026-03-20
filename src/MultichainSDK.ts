@@ -51,7 +51,16 @@ export class MultichainSDK {
 
   /**
    * Get a quote for a cross-chain swap without executing it.
-   * Use this to preview costs before committing funds.
+   *
+   * Use this to preview costs before committing funds. The quote includes
+   * the estimated source token amount, USD value, and a temporary Gnosis address.
+   * Quotes are time-sensitive — execute promptly via `executeSwap()`.
+   *
+   * For a simpler one-step flow, use `swap()` instead.
+   *
+   * @throws {ConfigurationError} If the source chain is unsupported or amounts are invalid
+   * @throws {PriceFetchError} If the BZZ price API is unavailable
+   * @throws {NoRouteError} If Relay Protocol finds no route for the swap
    */
   async getQuote(request: SwapRequest): Promise<SwapQuote> {
     this.validateRequest(request)
@@ -107,6 +116,14 @@ export class MultichainSDK {
 
   /**
    * Execute a swap from a previously obtained quote.
+   *
+   * Use this after `getQuote()` when you want to preview costs before executing.
+   * The quote contains the Relay Protocol quote object and temporary wallet — both
+   * are consumed during execution. Do not reuse a quote after execution.
+   *
+   * @param quote - Quote from `getQuote()`
+   * @param wallet - The same wallet adapter used to obtain the quote
+   * @param callbacks - Optional progress callbacks
    */
   async executeSwap(
     quote: SwapQuote,
@@ -156,6 +173,13 @@ export class MultichainSDK {
   /**
    * One-step convenience: quote and execute a swap in one call.
    * Delivers xBZZ and/or xDAI to the target address on Gnosis.
+   *
+   * Equivalent to calling `getQuote()` followed by `executeSwap()`.
+   * Use this when you don't need to preview costs before executing.
+   *
+   * @throws {ConfigurationError} If the source chain is unsupported or amounts are invalid
+   * @throws {PriceFetchError} If the BZZ price API is unavailable
+   * @throws {NoRouteError} If Relay Protocol finds no route for the swap
    */
   async swap(request: SwapRequest, callbacks?: SwapCallbacks): Promise<SwapResult> {
     const quote = await this.getQuote(request)
@@ -164,7 +188,14 @@ export class MultichainSDK {
 
   /**
    * Cross-chain swap + Swarm postage batch creation in one operation.
-   * SDK auto-calculates required xBZZ from batch parameters.
+   *
+   * The SDK auto-calculates the required xBZZ from `batchDepth` and `batchDurationDays`
+   * using the current Gnosis storage price. You only need to specify how much storage
+   * you want and for how long.
+   *
+   * @throws {ConfigurationError} If the source chain is unsupported
+   * @throws {PriceFetchError} If BZZ or storage price APIs are unavailable
+   * @throws {NoRouteError} If Relay Protocol finds no route for the swap
    */
   async createBatch(request: BatchRequest, callbacks?: SwapCallbacks): Promise<BatchResult> {
     this.validateRequest(request)
@@ -256,7 +287,11 @@ export class MultichainSDK {
     return result
   }
 
-  /** Get current BZZ/USD price */
+  /**
+   * Get the current BZZ/USD price from the Gnosis chain price oracle.
+   * @returns Price in USD per BZZ token (e.g. 0.35 means $0.35/BZZ)
+   * @throws {PriceFetchError} If the price API is unavailable
+   */
   async getBzzPrice(): Promise<number> {
     try {
       return await this.library.getGnosisBzzTokenPrice()
@@ -265,7 +300,11 @@ export class MultichainSDK {
     }
   }
 
-  /** Get current Gnosis storage price per block */
+  /**
+   * Get the current Gnosis storage price used for postage batch cost calculation.
+   * @returns Storage price as a bigint (pass to `getStampCost()` for batch cost estimation)
+   * @throws {PriceFetchError} If the price API is unavailable
+   */
   async getStoragePrice(): Promise<bigint> {
     try {
       return await this.library.getStoragePriceGnosis()
