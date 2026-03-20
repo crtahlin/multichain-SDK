@@ -158,6 +158,42 @@ try {
 | `ConfigurationError` | `CONFIGURATION_ERROR` | Invalid chain or params |
 | `PriceFetchError` | `PRICE_FETCH_FAILED` | Price API failure |
 
+## Mocked Mode
+
+For testing and development, create the SDK with `mocked: true` to simulate all blockchain operations without real transactions:
+
+```typescript
+const sdk = new MultichainSDK({ mocked: true })
+
+// All operations work normally but don't touch any blockchain
+const result = await sdk.swap({
+  wallet,
+  sourceChain: 8453,
+  targetAddress: '0xBeeNode...',
+  bzzAmount: 10,
+})
+// result.steps → all 6 steps completed (simulated)
+```
+
+Mocked mode is used in the example scripts — add `MOCKED=true` to any example command.
+
+## Batch Depth & Duration
+
+When creating postage batches, `batchDepth` determines storage capacity:
+
+| Depth | Storage Capacity |
+|---|---|
+| 17 | ~44 kB |
+| 18 | ~6.6 MB |
+| 19 | ~111 MB |
+| 20 | ~682 MB |
+| 21 | ~2.6 GB |
+| 22 | ~7.7 GB |
+| 23 | ~19.8 GB |
+| 24 | ~46.7 GB |
+
+`batchDurationDays` determines how long the batch remains valid. Cost scales linearly with duration and exponentially with depth.
+
 ## Fund Recovery
 
 If a swap fails mid-execution, the result includes the `temporaryPrivateKey` for the ephemeral Gnosis wallet. Use this to recover any bridged funds:
