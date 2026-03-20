@@ -22,8 +22,8 @@ interface QuoteResult {
 export class RelayProvider {
   private client: RelayClient
 
-  constructor() {
-    this.client = createClient({ chains: getRelayChains() })
+  constructor(client?: RelayClient) {
+    this.client = client ?? createClient({ chains: getRelayChains() })
   }
 
   getClient(): RelayClient {
