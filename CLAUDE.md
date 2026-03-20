@@ -81,7 +81,7 @@ src/
 
   mcp/
     server.ts           # MCP server implementation
-    tools.ts            # MCP tool definitions (6 tools)
+    tools.ts            # MCP tool definitions (9 tools)
     cli.ts              # CLI entry point: npx @multichain-dev/multichain-sdk-mcp
 ```
 
@@ -213,14 +213,17 @@ Ethereum (1), Polygon (137), Optimism (10), Arbitrum (42161), Base (8453). Desti
 
 ## MCP Tools
 
-| Tool | Description |
-|---|---|
-| `multichain_get_quote` | Get swap quote |
-| `multichain_execute_swap` | Execute from quote |
-| `multichain_swap` | One-step quote + execute |
-| `multichain_create_batch` | Swap + batch creation |
-| `multichain_get_bzz_price` | BZZ/USD price |
-| `multichain_calculate_batch_cost` | Batch cost calculator |
+| Tool | Description | Wallet needed? |
+|---|---|---|
+| `multichain_wallet_status` | Check funding wallet configuration | No |
+| `multichain_get_supported_chains` | List supported source chains | No |
+| `multichain_get_supported_tokens` | List tokens on a source chain | No |
+| `multichain_get_bzz_price` | BZZ/USD price | No |
+| `multichain_calculate_batch_cost` | Estimate storage cost | No |
+| `multichain_get_quote` | Preview funding cost (returns quoteId) | No |
+| `multichain_execute_swap` | Execute from quoteId | Yes |
+| `multichain_swap` | Fund Bee node (one step) | Yes |
+| `multichain_create_batch` | Rent Swarm storage | Yes |
 
 ## Agent Wallet Compatibility
 

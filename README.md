@@ -232,6 +232,45 @@ const result = await sdk.swap(request)
 // for the temporary wallet that received bridged xDAI
 ```
 
+## MCP Server
+
+The SDK includes an MCP (Model Context Protocol) server that exposes all functionality as tools for AI agents like Claude.
+
+### Setup with Claude Desktop
+
+Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "multichain": {
+      "command": "npx",
+      "args": ["@multichain-dev/multichain-sdk-mcp"],
+      "env": {
+        "PRIVATE_KEY": "0x...",
+        "SOURCE_CHAIN": "8453"
+      }
+    }
+  }
+}
+```
+
+### Available Tools
+
+| Tool | Description | Wallet needed? |
+|---|---|---|
+| `multichain_wallet_status` | Check funding wallet configuration | No |
+| `multichain_get_supported_chains` | List supported source chains | No |
+| `multichain_get_supported_tokens` | List tokens on a source chain | No |
+| `multichain_get_bzz_price` | Get BZZ/USD price | No |
+| `multichain_calculate_batch_cost` | Estimate storage cost | No |
+| `multichain_get_quote` | Preview funding cost (returns quoteId) | No |
+| `multichain_execute_swap` | Execute from quoteId | Yes |
+| `multichain_swap` | Fund Bee node (one step) | Yes |
+| `multichain_create_batch` | Rent Swarm storage | Yes |
+
+Tools marked "Wallet needed" require `PRIVATE_KEY` and `SOURCE_CHAIN` environment variables. Read-only tools work without credentials.
+
 ## Examples
 
 The `examples/` directory contains runnable scripts demonstrating common SDK use cases:
