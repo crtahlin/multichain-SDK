@@ -1,10 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { Strings } from 'cafe-utility'
+import { createPublicClient, formatUnits, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { MultichainSDK } from '../MultichainSDK.js'
 import { EvmPrivateKeyWallet } from '../wallets/EvmPrivateKeyWallet.js'
-import { getStampCost, SUPPORTED_CHAINS } from '../config.js'
+import { DEFAULT_RPC_URLS, getStampCost, SUPPORTED_CHAINS } from '../config.js'
 import type { SwapQuote, SupportedChainId } from '../types.js'
 
 const QUOTE_TTL_MS = 5 * 60 * 1000 // 5 minutes
@@ -79,6 +80,16 @@ function getChainName(chainId: number): string | undefined {
   return chain?.name
 }
 
+async function getNativeBalance(address: `0x${string}`, chainId: SupportedChainId): Promise<{ balance: string; symbol: string }> {
+  const chain = SUPPORTED_CHAINS[chainId]
+  const client = createPublicClient({ chain, transport: http(DEFAULT_RPC_URLS[chainId]) })
+  const balance = await client.getBalance({ address })
+  return {
+    balance: formatUnits(balance, chain.nativeCurrency.decimals),
+    symbol: chain.nativeCurrency.symbol,
+  }
+}
+
 export function createMcpServer(): McpServer {
   const sdk = new MultichainSDK()
   const quoteStore = new Map<string, StoredQuote>()
@@ -127,7 +138,7 @@ If the user also has the swarm_mcp server configured, you can use it to find the
     {
       title: 'Check Wallet Configuration',
       description:
-        'Check whether a funding wallet is configured and show its address and chain. ' +
+        'Check whether a funding wallet is configured and show its address, chain, and native token balance. ' +
         'Use this first to verify the setup before attempting any transactions. ' +
         'Note: the funding wallet is NOT the Bee node — it\'s the wallet that pays for swaps.',
     },
@@ -176,16 +187,86 @@ If the user also has the swarm_mcp server configured, you can use it to find the
         )
       }
 
-      return jsonResult({
+      const result: Record<string, unknown> = {
         configured: true,
         fundingAddress: address,
         sourceChain: { id: chainId, name: chainName },
         note: 'This is the funding wallet address — NOT the Bee node address. The Bee node has its own separate Gnosis chain address.',
-      })
+      }
+
+      try {
+        const { balance, symbol } = await getNativeBalance(address as `0x${string}`, chainId as SupportedChainId)
+        result.nativeBalance = balance
+        result.nativeSymbol = symbol
+      } catch {
+        result.nativeBalance = null
+        result.balanceError = 'Could not fetch balance (RPC error). The wallet is still configured correctly.'
+      }
+
+      return jsonResult(result)
     },
   )
 
-  // 2. multichain_get_supported_chains
+  // 2. multichain_wallet_balance
+  server.registerTool(
+    'multichain_wallet_balance',
+    {
+      title: 'Check Balances Across Chains',
+      description:
+        'Check the funding wallet\'s native token balance on all supported chains (Ethereum, Polygon, Optimism, Arbitrum, Base). ' +
+        'Use this to find where your funds are before choosing a source chain. ' +
+        'Requires a configured funding wallet (PRIVATE_KEY). SOURCE_CHAIN is not required — this checks all chains.',
+    },
+    async () => {
+      const privateKey = process.env.PRIVATE_KEY
+      if (!privateKey) {
+        return errorResult(WALLET_SETUP_INSTRUCTIONS)
+      }
+
+      let address: `0x${string}`
+      try {
+        const account = privateKeyToAccount(privateKey as `0x${string}`)
+        address = account.address
+      } catch {
+        return errorResult(
+          'PRIVATE_KEY is set but invalid. It should be a 64-character hex string starting with 0x (e.g. 0xabc123...).'
+        )
+      }
+
+      const sourceChainStr = process.env.SOURCE_CHAIN
+      const configuredChainId = sourceChainStr ? parseInt(sourceChainStr, 10) : null
+
+      const chainIds = Object.keys(SUPPORTED_CHAINS).map(Number) as SupportedChainId[]
+      const results = await Promise.allSettled(
+        chainIds.map(async (chainId) => {
+          const { balance, symbol } = await getNativeBalance(address, chainId)
+          return { chainId, chainName: SUPPORTED_CHAINS[chainId].name, balance, symbol }
+        })
+      )
+
+      const balances = results.map((result, i) => {
+        const chainId = chainIds[i]
+        if (result.status === 'fulfilled') {
+          return {
+            ...result.value,
+            isConfiguredChain: chainId === configuredChainId,
+          }
+        }
+        return {
+          chainId,
+          chainName: SUPPORTED_CHAINS[chainId].name,
+          balance: null,
+          symbol: SUPPORTED_CHAINS[chainId].nativeCurrency.symbol,
+          error: 'RPC error — could not fetch balance for this chain',
+          isConfiguredChain: chainId === configuredChainId,
+        }
+      })
+
+      return jsonResult({ fundingAddress: address, balances })
+    },
+  )
+
+  // 3. multichain_get_supported_chains
   server.registerTool(
     'multichain_get_supported_chains',
     {
