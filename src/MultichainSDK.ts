@@ -26,7 +26,7 @@ const DUMMY_SOURCE_ADDRESS = '0x0000000000000000000000000000000000000001' as `0x
  *
  * @example
  * ```typescript
- * import { MultichainSDK, EvmPrivateKeyWallet } from '@upcoming/multichain-sdk'
+ * import { MultichainSDK, EvmPrivateKeyWallet } from '@multichain-dev/multichain-sdk'
  *
  * const sdk = new MultichainSDK()
  * const wallet = new EvmPrivateKeyWallet({ privateKey: '0x...', chainId: 8453 })

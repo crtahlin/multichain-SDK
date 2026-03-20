@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`@upcoming/multichain-sdk` is a headless SDK that enables AI agents to perform cross-chain token swaps to Gnosis chain (xDAI/xBZZ) and create Swarm postage batches. No UI, no browser dependencies — pure Node.js.
+`@multichain-dev/multichain-sdk` is a headless SDK that enables AI agents to perform cross-chain token swaps to Gnosis chain (xDAI/xBZZ) and create Swarm postage batches. No UI, no browser dependencies — pure Node.js.
 
 ### Related Repositories
 
@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 @upcoming/multichain-library   (dependency — low-level Gnosis ops)
        ↓
-@upcoming/multichain-sdk       (this repo — orchestration + agent interface)
+@multichain-dev/multichain-sdk       (this repo — orchestration + agent interface)
        ↑
 Agent wallets (Coinbase AgentKit, Turnkey, raw keys, etc.)
 ```
@@ -29,7 +29,7 @@ The widget and SDK are siblings that share the same dependency (`multichain-libr
 - **Build:** `pnpm build` (tsup, outputs CJS + ESM + declarations to `dist/`)
 - **Type check:** `pnpm check` (`tsc --noEmit`)
 - **Test:** `pnpm test` (vitest)
-- **MCP server:** `npx @upcoming/multichain-sdk-mcp`
+- **MCP server:** `npx @multichain-dev/multichain-sdk-mcp`
 
 ## Dependencies
 
@@ -82,7 +82,7 @@ src/
   mcp/
     server.ts           # MCP server implementation
     tools.ts            # MCP tool definitions (6 tools)
-    cli.ts              # CLI entry point: npx @upcoming/multichain-sdk-mcp
+    cli.ts              # CLI entry point: npx @multichain-dev/multichain-sdk-mcp
 ```
 
 ## Key Concepts

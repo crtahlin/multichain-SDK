@@ -1,4 +1,4 @@
-# @upcoming/multichain-sdk
+# @multichain-dev/multichain-sdk
 
 > **Disclaimer:** This software is experimental and provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and noninfringement. This project is under active development and is not intended for production use. Use at your own risk. The authors assume no liability for any damages, loss of funds, or other consequences arising from the use of this software. Always verify transactions and review code before interacting with real blockchain networks or committing real funds.
 
@@ -7,13 +7,13 @@ Headless Node.js SDK that enables AI agents to perform cross-chain token swaps t
 ## Installation
 
 ```bash
-pnpm add @upcoming/multichain-sdk
+pnpm add @multichain-dev/multichain-sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import { MultichainSDK, EvmPrivateKeyWallet } from '@upcoming/multichain-sdk'
+import { MultichainSDK, EvmPrivateKeyWallet } from '@multichain-dev/multichain-sdk'
 
 const sdk = new MultichainSDK()
 const wallet = new EvmPrivateKeyWallet({
@@ -150,7 +150,7 @@ const result = await sdk.swap(request, {
 All errors extend `MultichainError` with a machine-readable `code`:
 
 ```typescript
-import { NoRouteError, ConfigurationError } from '@upcoming/multichain-sdk'
+import { NoRouteError, ConfigurationError } from '@multichain-dev/multichain-sdk'
 
 try {
   await sdk.swap(request)
@@ -255,7 +255,7 @@ pnpm test         # Run tests (vitest)
 ```
 @upcoming/multichain-library   (dependency — low-level Gnosis ops)
        ↓
-@upcoming/multichain-sdk       (this repo — orchestration + agent interface)
+@multichain-dev/multichain-sdk       (this repo — orchestration + agent interface)
        ↑
 Agent wallets (Coinbase AgentKit, Turnkey, raw keys, etc.)
 ```

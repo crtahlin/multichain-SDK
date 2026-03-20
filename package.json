@@ -1,5 +1,5 @@
 {
-  "name": "@upcoming/multichain-sdk",
+  "name": "@multichain-dev/multichain-sdk",
   "version": "0.1.0",
   "description": "Headless SDK for cross-chain token swaps to Gnosis chain and Swarm postage batch creation",
   "type": "module",
