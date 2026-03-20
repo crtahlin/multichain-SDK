@@ -536,6 +536,60 @@ describe('MultichainSDK', () => {
     }, 30000)
   })
 
+  describe('getSupportedChains', () => {
+    it('returns all 5 supported chains', () => {
+      const sdk = new MultichainSDK()
+      const chains = sdk.getSupportedChains()
+      expect(chains).toHaveLength(5)
+    })
+
+    it('includes expected chain IDs', () => {
+      const sdk = new MultichainSDK()
+      const chains = sdk.getSupportedChains()
+      const ids = chains.map(c => c.id)
+      expect(ids).toContain(1)
+      expect(ids).toContain(137)
+      expect(ids).toContain(10)
+      expect(ids).toContain(42161)
+      expect(ids).toContain(8453)
+    })
+
+    it('returns id and name for each chain', () => {
+      const sdk = new MultichainSDK()
+      const chains = sdk.getSupportedChains()
+      for (const chain of chains) {
+        expect(typeof chain.id).toBe('number')
+        expect(typeof chain.name).toBe('string')
+        expect(chain.name.length).toBeGreaterThan(0)
+      }
+    })
+  })
+
+  describe('getSupportedTokens', () => {
+    it('returns tokens for Base', async () => {
+      const sdk = new MultichainSDK()
+      const tokens = await sdk.getSupportedTokens(8453)
+      expect(tokens.length).toBeGreaterThan(0)
+      for (const token of tokens) {
+        expect(typeof token.address).toBe('string')
+        expect(typeof token.symbol).toBe('string')
+        expect(typeof token.name).toBe('string')
+        expect(typeof token.decimals).toBe('number')
+      }
+    }, 30000)
+
+    it('returns tokens for Ethereum', async () => {
+      const sdk = new MultichainSDK()
+      const tokens = await sdk.getSupportedTokens(1)
+      expect(tokens.length).toBeGreaterThan(0)
+    }, 30000)
+
+    it('rejects unsupported chain ID', async () => {
+      const sdk = new MultichainSDK()
+      await expect(sdk.getSupportedTokens(999)).rejects.toThrow(ConfigurationError)
+    })
+  })
+
   describe('concurrent calls', () => {
     it('concurrent swaps generate unique temporary wallets', async () => {
       const sdk = new MultichainSDK({ mocked: true })

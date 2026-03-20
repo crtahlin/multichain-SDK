@@ -11,6 +11,8 @@ export type {
   MultichainSDKOptions,
   SupportedChainId,
   StepStatus,
+  ChainInfo,
+  TokenInfo,
 } from './types'
 export { EvmPrivateKeyWallet } from './wallets/EvmPrivateKeyWallet'
 export { EvmWalletClientAdapter } from './wallets/EvmWalletClientAdapter'
