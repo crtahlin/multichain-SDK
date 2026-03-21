@@ -250,7 +250,7 @@ describe('MCP Server', () => {
       expect(data.chains.map((c: { id: number }) => c.id)).toContain(8453)
     })
 
-    it('multichain_get_supported_tokens returns tokens for Base', async () => {
+    it('multichain_get_supported_tokens returns tokens for Base by ID', async () => {
       const result = await client.callTool({
         name: 'multichain_get_supported_tokens',
         arguments: { chainId: 8453 },
@@ -262,7 +262,38 @@ describe('MCP Server', () => {
       expect(data.tokens[0]).toHaveProperty('address')
     }, 30000)
 
-    it('multichain_get_supported_tokens returns error for invalid chain', async () => {
+    it('multichain_get_supported_tokens accepts chain name "base"', async () => {
+      const result = await client.callTool({
+        name: 'multichain_get_supported_tokens',
+        arguments: { chainId: 'base' },
+      })
+      const content = result.content as Array<{ type: string; text: string }>
+      const data = JSON.parse(content[0].text)
+      expect(data.tokens.length).toBeGreaterThan(0)
+    }, 30000)
+
+    it('multichain_get_supported_tokens accepts chain name "ethereum"', async () => {
+      const result = await client.callTool({
+        name: 'multichain_get_supported_tokens',
+        arguments: { chainId: 'ethereum' },
+      })
+      const content = result.content as Array<{ type: string; text: string }>
+      const data = JSON.parse(content[0].text)
+      expect(data.tokens.length).toBeGreaterThan(0)
+    }, 30000)
+
+    it('multichain_get_supported_tokens returns error for unknown chain name', async () => {
+      const result = await client.callTool({
+        name: 'multichain_get_supported_tokens',
+        arguments: { chainId: 'solana' },
+      })
+      expect(result.isError).toBe(true)
+      const content = result.content as Array<{ type: string; text: string }>
+      const data = JSON.parse(content[0].text)
+      expect(data.error).toContain('Unknown chain')
+    })
+
+    it('multichain_get_supported_tokens returns error for invalid chain ID', async () => {
       const result = await client.callTool({
         name: 'multichain_get_supported_tokens',
         arguments: { chainId: 999 },
@@ -361,7 +392,7 @@ describe('MCP Server', () => {
   })
 
   describe('quote store', () => {
-    it('multichain_get_quote returns a quoteId', async () => {
+    it('multichain_get_quote returns a quoteId with expiresAt', async () => {
       const result = await client.callTool({
         name: 'multichain_get_quote',
         arguments: {
@@ -377,6 +408,39 @@ describe('MCP Server', () => {
       expect(typeof data.quoteId).toBe('string')
       expect(data.estimatedUsdValue).toBeGreaterThan(0)
       expect(data.expiresInSeconds).toBe(300)
+      // #60: expiresAt should be a valid ISO timestamp ~5 min in the future
+      expect(data.expiresAt).toBeDefined()
+      const expiresAt = new Date(data.expiresAt).getTime()
+      expect(expiresAt).toBeGreaterThan(Date.now())
+      expect(expiresAt).toBeLessThanOrEqual(Date.now() + 5 * 60 * 1000 + 5000)
+    }, 30000)
+
+    it('multichain_get_quote works without targetAddress (#58)', async () => {
+      const result = await client.callTool({
+        name: 'multichain_get_quote',
+        arguments: {
+          sourceChain: 8453,
+          bzzAmount: 10,
+        },
+      })
+      const content = result.content as Array<{ type: string; text: string }>
+      const data = JSON.parse(content[0].text)
+      expect(data.quoteId).toBeDefined()
+      expect(data.estimatedUsdValue).toBeGreaterThan(0)
+    }, 30000)
+
+    it('multichain_get_quote accepts chain name (#59)', async () => {
+      const result = await client.callTool({
+        name: 'multichain_get_quote',
+        arguments: {
+          sourceChain: 'base',
+          bzzAmount: 5,
+        },
+      })
+      const content = result.content as Array<{ type: string; text: string }>
+      const data = JSON.parse(content[0].text)
+      expect(data.quoteId).toBeDefined()
+      expect(data.estimatedUsdValue).toBeGreaterThan(0)
     }, 30000)
 
     it('multichain_execute_swap rejects nonexistent quoteId', async () => {

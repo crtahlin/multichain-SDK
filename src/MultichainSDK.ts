@@ -144,12 +144,21 @@ export class MultichainSDK {
    * @param quote - Quote from `getQuote()`
    * @param wallet - The same wallet adapter used to obtain the quote
    * @param callbacks - Optional progress callbacks
+   * @param targetAddress - Override target address (required if not set in the quote)
    */
   async executeSwap(
     quote: SwapQuote,
     wallet: EvmWalletAdapter,
     callbacks?: SwapCallbacks,
+    targetAddress?: `0x${string}`,
   ): Promise<SwapResult> {
+    const resolvedTarget = targetAddress ?? quote.request.targetAddress
+    if (!resolvedTarget) {
+      throw new ConfigurationError(
+        'targetAddress is required for execution. Provide it either in the quote request or as a parameter to executeSwap().'
+      )
+    }
+
     const sourceToken = quote.request.sourceToken ?? this.library.constants.nullAddress
     const metadata: Record<string, string> = {}
 
@@ -170,7 +179,7 @@ export class MultichainSDK {
       sourceToken,
       sourceTokenAmount: quote.sourceTokenAmount,
       sendTransactionAsync,
-      targetAddress: quote.request.targetAddress,
+      targetAddress: resolvedTarget,
       temporaryAddress: quote.temporaryAddress,
       temporaryPrivateKey: quote.temporaryPrivateKey,
       bzzUsdValue: quote.bzzUsdValue,

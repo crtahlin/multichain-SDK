@@ -220,10 +220,12 @@ Ethereum (1), Polygon (137), Optimism (10), Arbitrum (42161), Base (8453). Desti
 | `multichain_get_supported_tokens` | List tokens on a source chain | No |
 | `multichain_get_bzz_price` | BZZ/USD price | No |
 | `multichain_calculate_batch_cost` | Estimate storage cost | No |
-| `multichain_get_quote` | Preview funding cost (returns quoteId) | No |
-| `multichain_execute_swap` | Execute from quoteId | Yes |
+| `multichain_get_quote` | Preview funding cost (returns quoteId + expiresAt) | No |
+| `multichain_execute_swap` | Execute from quoteId (accepts targetAddress) | Yes |
 | `multichain_swap` | Fund Bee node (one step) | Yes |
 | `multichain_create_batch` | Rent Swarm storage | Yes |
+
+All tools accepting `sourceChain` or `chainId` accept both numeric IDs (8453) and names ("base", "ethereum", "polygon", "optimism", "arbitrum"). `targetAddress` is optional for `multichain_get_quote` — provide it later via `multichain_execute_swap`.
 
 ## Agent Wallet Compatibility
 

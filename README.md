@@ -88,20 +88,19 @@ console.log('Batch ID:', result.batchId)
 
 ### 4. Preview costs before executing
 
-No wallet or private key needed — just specify what you want:
+No wallet or private key needed — `targetAddress` is optional for quotes:
 
 ```typescript
 const quote = await sdk.getQuote({
   sourceChain: 8453,
-  targetAddress: '0xBeeNode...',
   bzzAmount: 10,
   nativeAmount: 0.5,
 })
 console.log(`Cost: ${quote.sourceTokenAmount.toDecimalString()} source tokens`)
 console.log(`Estimated: $${quote.estimatedUsdValue.toFixed(2)}`)
 
-// Execute only if the user approves
-const result = await sdk.executeSwap(quote, wallet)
+// Execute with targetAddress provided at execution time
+const result = await sdk.executeSwap(quote, wallet, undefined, '0xBeeNode...')
 ```
 
 ### 5. Discover supported chains and tokens
@@ -267,12 +266,18 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 | `multichain_get_supported_tokens` | List tokens on a source chain | No |
 | `multichain_get_bzz_price` | Get BZZ/USD price | No |
 | `multichain_calculate_batch_cost` | Estimate storage cost | No |
-| `multichain_get_quote` | Preview funding cost (returns quoteId) | No |
-| `multichain_execute_swap` | Execute from quoteId | Yes |
+| `multichain_get_quote` | Preview funding cost (returns quoteId + expiresAt timestamp) | No |
+| `multichain_execute_swap` | Execute from quoteId (accepts targetAddress if not in quote) | Yes |
 | `multichain_swap` | Fund Bee node (one step) | Yes |
 | `multichain_create_batch` | Rent Swarm storage | Yes |
 
-Tools marked "Wallet needed" require `PRIVATE_KEY` and `SOURCE_CHAIN` environment variables. Read-only tools work without credentials.
+Tools marked "Wallet needed" require `PRIVATE_KEY` environment variable. `SOURCE_CHAIN` is optional — if not set, specify the chain in each tool call.
+
+### Agent-Friendly Features
+
+- **Chain names accepted:** All chain parameters accept names (`"base"`, `"ethereum"`, `"polygon"`, `"optimism"`, `"arbitrum"`) alongside numeric IDs
+- **Optional targetAddress for quotes:** `multichain_get_quote` works without `targetAddress` — provide it later at execution time via `multichain_execute_swap`
+- **Quote expiry timestamps:** Quotes include `expiresAt` (ISO 8601) in addition to `expiresInSeconds`
 
 > **Agent frameworks (LangChain, CrewAI, Vercel AI SDK, etc.):** Environment variables set at the process level are shared automatically across all MCP servers — no need to duplicate keys in per-server config blocks. The `env` block above is only needed for Claude Desktop.
 
