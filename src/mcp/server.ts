@@ -48,16 +48,23 @@ Tip: You can check your funding wallet balance on a block explorer (e.g. basesca
 
 After updating the config, restart your MCP client (e.g. Claude Desktop) for changes to take effect.`
 
-function getWallet(chainIdOverride?: number): EvmPrivateKeyWallet {
+function getWallet(chainIdOverride?: number | string): EvmPrivateKeyWallet {
   const privateKey = process.env.PRIVATE_KEY
   if (!privateKey) {
     throw new Error(WALLET_SETUP_INSTRUCTIONS)
   }
 
-  const chainId = chainIdOverride ?? (process.env.SOURCE_CHAIN ? parseInt(process.env.SOURCE_CHAIN, 10) : undefined)
+  const resolved = chainIdOverride != null ? resolveChainId(chainIdOverride) : undefined
+  const chainId = resolved ?? (process.env.SOURCE_CHAIN ? parseInt(process.env.SOURCE_CHAIN, 10) : undefined)
   if (!chainId) {
     throw new Error(
       'No source chain specified. Either set SOURCE_CHAIN in your MCP server config, or provide sourceChain in the tool call.'
+    )
+  }
+
+  if (chainIdOverride != null && resolved == null) {
+    throw new Error(
+      `Unknown chain "${chainIdOverride}". Use a chain ID (1, 137, 10, 42161, 8453) or name (ethereum, polygon, optimism, arbitrum, base).`
     )
   }
 
@@ -85,6 +92,33 @@ function getChainName(chainId: number): string | undefined {
   const chain = SUPPORTED_CHAINS[chainId as SupportedChainId]
   return chain?.name
 }
+
+/** Map of lowercase chain names/aliases to chain IDs */
+const CHAIN_NAME_MAP: Record<string, SupportedChainId> = {
+  ethereum: 1, eth: 1, mainnet: 1,
+  polygon: 137, matic: 137, poly: 137,
+  optimism: 10, op: 10,
+  arbitrum: 42161, arb: 42161,
+  base: 8453,
+}
+
+/**
+ * Resolve a chain identifier (number or name) to a numeric chain ID.
+ * Accepts: numeric IDs (8453), numeric strings ("8453"), or names ("base", "ethereum").
+ * Returns undefined if the input cannot be resolved.
+ */
+function resolveChainId(input: number | string): number | undefined {
+  if (typeof input === 'number') return input
+  const trimmed = input.trim()
+  const asNumber = Number(trimmed)
+  if (!isNaN(asNumber) && trimmed.length > 0) return asNumber
+  return CHAIN_NAME_MAP[trimmed.toLowerCase()]
+}
+
+/** Zod schema for chain parameters that accept both IDs and names */
+const chainIdSchema = z.union([z.number(), z.string()]).describe(
+  'Chain ID (e.g. 8453) or name (e.g. "base", "ethereum", "polygon", "optimism", "arbitrum").'
+)
 
 async function getNativeBalance(address: `0x${string}`, chainId: SupportedChainId): Promise<{ balance: string; symbol: string }> {
   const chain = SUPPORTED_CHAINS[chainId]
@@ -298,11 +332,15 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
       description:
         'List tokens you can use to pay on a given source chain (e.g. ETH, USDC, USDT on Base). ' +
         'Use multichain_get_supported_chains first to find the chain ID.',
-      inputSchema: { chainId: z.number().describe('Source chain ID (e.g. 8453 for Base). Use multichain_get_supported_chains to find options.') },
+      inputSchema: { chainId: chainIdSchema },
     },
     async ({ chainId }) => {
+      const resolved = resolveChainId(chainId)
+      if (resolved == null) {
+        return errorResult(`Unknown chain "${chainId}". Use a chain ID (1, 137, 10, 42161, 8453) or name (ethereum, polygon, optimism, arbitrum, base).`)
+      }
       try {
-        const tokens = await sdk.getSupportedTokens(chainId)
+        const tokens = await sdk.getSupportedTokens(resolved)
         return jsonResult({ tokens })
       } catch (error: unknown) {
         return errorResult(error instanceof Error ? error.message : String(error))
@@ -374,7 +412,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
         'No wallet needed — use this to check costs before committing. ' +
         'Quote expires after 5 minutes. At least one of bzzAmount or nativeAmount must be > 0.',
       inputSchema: {
-        sourceChain: z.number().describe('Chain ID where your funds are (1=Ethereum, 137=Polygon, 10=Optimism, 42161=Arbitrum, 8453=Base).'),
+        sourceChain: chainIdSchema,
         targetAddress: z.string().optional().describe('Bee node\'s Gnosis address (0x...). Optional for quotes — can be provided later at execution time. Find via Bee API (/addresses endpoint) or swarm_mcp.'),
         bzzAmount: z.number().optional().describe('Amount of xBZZ (Swarm storage token) to deliver. In whole BZZ units. Defaults to 0.'),
         nativeAmount: z.number().optional().describe('Amount of xDAI (for transaction fees) to deliver. In whole DAI units. Defaults to 0.'),
@@ -382,9 +420,13 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
       },
     },
     async ({ sourceChain, targetAddress, bzzAmount, nativeAmount, sourceToken }) => {
+      const resolvedChain = resolveChainId(sourceChain)
+      if (resolvedChain == null) {
+        return errorResult(`Unknown chain "${sourceChain}". Use a chain ID (1, 137, 10, 42161, 8453) or name (ethereum, polygon, optimism, arbitrum, base).`)
+      }
       try {
         const quote = await sdk.getQuote({
-          sourceChain: sourceChain as SupportedChainId,
+          sourceChain: resolvedChain as SupportedChainId,
           targetAddress: targetAddress as `0x${string}` | undefined,
           bzzAmount,
           nativeAmount,
@@ -472,7 +514,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
         'At least one of bzzAmount or nativeAmount must be > 0. ' +
         'Requires a configured funding wallet — use multichain_wallet_status to check.',
       inputSchema: {
-        sourceChain: z.number().describe('Chain ID where your funds are (1=Ethereum, 137=Polygon, 10=Optimism, 42161=Arbitrum, 8453=Base).'),
+        sourceChain: chainIdSchema,
         targetAddress: z.string().describe('Bee node\'s Gnosis address (0x...). Find via Bee API (/addresses endpoint) or swarm_mcp.'),
         bzzAmount: z.number().optional().describe('Amount of xBZZ (Swarm storage token) to deliver. In whole BZZ units. Defaults to 0.'),
         nativeAmount: z.number().optional().describe('Amount of xDAI (for transaction fees) to deliver. In whole DAI units. Defaults to 0.'),
@@ -480,9 +522,13 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
       },
     },
     async ({ sourceChain, targetAddress, bzzAmount, nativeAmount, sourceToken }) => {
+      const resolvedChain = resolveChainId(sourceChain)
+      if (resolvedChain == null) {
+        return errorResult(`Unknown chain "${sourceChain}". Use a chain ID (1, 137, 10, 42161, 8453) or name (ethereum, polygon, optimism, arbitrum, base).`)
+      }
       let wallet
       try {
-        wallet = getWallet(sourceChain)
+        wallet = getWallet(resolvedChain)
       } catch (error: unknown) {
         return errorResult(error instanceof Error ? error.message : String(error))
       }
@@ -490,7 +536,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
       try {
         const result = await sdk.swap({
           wallet,
-          sourceChain: sourceChain as SupportedChainId,
+          sourceChain: resolvedChain as SupportedChainId,
           targetAddress: targetAddress as `0x${string}`,
           bzzAmount,
           nativeAmount,
@@ -521,7 +567,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
         '21 (~2.6 GB), 22 (~7.7 GB), 23 (~19.8 GB), 24 (~46.7 GB). ' +
         'Requires a configured funding wallet — use multichain_wallet_status to check.',
       inputSchema: {
-        sourceChain: z.number().describe('Chain ID where your funds are (1=Ethereum, 137=Polygon, 10=Optimism, 42161=Arbitrum, 8453=Base).'),
+        sourceChain: chainIdSchema,
         targetAddress: z.string().describe('Bee node\'s Gnosis address (0x...) to receive remaining xDAI. Find via Bee API or swarm_mcp.'),
         batchDepth: z.number().int().min(17).max(24).describe('Storage capacity level (17-24). 20 (~682 MB) is recommended for most use cases.'),
         batchDurationDays: z.number().positive().describe('How many days the storage should last.'),
@@ -529,9 +575,13 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
       },
     },
     async ({ sourceChain, targetAddress, batchDepth, batchDurationDays, nativeAmount }) => {
+      const resolvedChain = resolveChainId(sourceChain)
+      if (resolvedChain == null) {
+        return errorResult(`Unknown chain "${sourceChain}". Use a chain ID (1, 137, 10, 42161, 8453) or name (ethereum, polygon, optimism, arbitrum, base).`)
+      }
       let wallet
       try {
-        wallet = getWallet(sourceChain)
+        wallet = getWallet(resolvedChain)
       } catch (error: unknown) {
         return errorResult(error instanceof Error ? error.message : String(error))
       }
@@ -539,7 +589,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
       try {
         const result = await sdk.createBatch({
           wallet,
-          sourceChain: sourceChain as SupportedChainId,
+          sourceChain: resolvedChain as SupportedChainId,
           targetAddress: targetAddress as `0x${string}`,
           batchDepth,
           batchDurationDays,
