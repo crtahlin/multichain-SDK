@@ -408,9 +408,11 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
       title: 'Preview Funding Cost',
       description:
         'Preview how much it will cost to fund a Bee node, without executing anything. ' +
-        'Returns a quoteId and estimated cost. Pass the quoteId to multichain_execute_swap to execute. ' +
-        'No wallet needed — use this to check costs before committing. ' +
-        'Quote expires after 5 minutes. At least one of bzzAmount or nativeAmount must be > 0.',
+        'Returns a quoteId, estimated cost, and an expiresAt timestamp. ' +
+        'Pass the quoteId to multichain_execute_swap to execute within the 5-minute window. ' +
+        'No wallet or targetAddress needed — use this to check costs before committing. ' +
+        'IMPORTANT: Quotes expire after 5 minutes — check the expiresAt field and execute promptly. ' +
+        'At least one of bzzAmount or nativeAmount must be > 0.',
       inputSchema: {
         sourceChain: chainIdSchema,
         targetAddress: z.string().optional().describe('Bee node\'s Gnosis address (0x...). Optional for quotes — can be provided later at execution time. Find via Bee API (/addresses endpoint) or swarm_mcp.'),
