@@ -80,9 +80,8 @@ src/
     Mocked*.ts          # Mocked variants for testing (no real blockchain txs)
 
   mcp/
-    server.ts           # MCP server implementation
-    tools.ts            # MCP tool definitions (9 tools)
-    cli.ts              # CLI entry point: npx @multichain-dev/multichain-sdk-mcp
+    server.ts           # MCP server: createMcpServer() with 10 tools
+    cli.ts              # CLI entry point: node dist/mcp/cli.js (stdio transport)
 ```
 
 ## Key Concepts
