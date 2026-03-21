@@ -375,7 +375,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
         'Quote expires after 5 minutes. At least one of bzzAmount or nativeAmount must be > 0.',
       inputSchema: {
         sourceChain: z.number().describe('Chain ID where your funds are (1=Ethereum, 137=Polygon, 10=Optimism, 42161=Arbitrum, 8453=Base).'),
-        targetAddress: z.string().describe('Bee node\'s Gnosis address (0x...). Find via Bee API (/addresses endpoint) or swarm_mcp.'),
+        targetAddress: z.string().optional().describe('Bee node\'s Gnosis address (0x...). Optional for quotes — can be provided later at execution time. Find via Bee API (/addresses endpoint) or swarm_mcp.'),
         bzzAmount: z.number().optional().describe('Amount of xBZZ (Swarm storage token) to deliver. In whole BZZ units. Defaults to 0.'),
         nativeAmount: z.number().optional().describe('Amount of xDAI (for transaction fees) to deliver. In whole DAI units. Defaults to 0.'),
         sourceToken: z.string().optional().describe('Token address to pay with. Defaults to native token (ETH). Use multichain_get_supported_tokens to find options like USDC.'),
@@ -385,13 +385,14 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
       try {
         const quote = await sdk.getQuote({
           sourceChain: sourceChain as SupportedChainId,
-          targetAddress: targetAddress as `0x${string}`,
+          targetAddress: targetAddress as `0x${string}` | undefined,
           bzzAmount,
           nativeAmount,
           sourceToken: sourceToken as `0x${string}` | undefined,
         })
 
         const quoteId = Strings.randomHex(16)
+        const expiresAt = new Date(Date.now() + QUOTE_TTL_MS).toISOString()
         quoteStore.set(quoteId, { quote, expiresAt: Date.now() + QUOTE_TTL_MS })
 
         return jsonResult({
@@ -400,6 +401,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
           estimatedUsdValue: quote.estimatedUsdValue,
           bzzUsdPrice: quote.bzzUsdPrice,
           expiresInSeconds: 300,
+          expiresAt,
         })
       } catch (error: unknown) {
         return errorResult(error instanceof Error ? error.message : String(error))
@@ -416,12 +418,14 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
         'Execute a previously previewed swap. The quoteId comes from multichain_get_quote. ' +
         'Each quote can only be used once and expires after 5 minutes. ' +
         'The source chain is determined by the quote — no need to specify it again. ' +
+        'If targetAddress was not provided in the quote, you must provide it here. ' +
         'Requires a configured funding wallet (PRIVATE_KEY) — use multichain_wallet_status to check.',
       inputSchema: {
         quoteId: z.string().describe('Quote ID from multichain_get_quote'),
+        targetAddress: z.string().optional().describe('Bee node\'s Gnosis address (0x...). Required if not provided in the original quote.'),
       },
     },
-    async ({ quoteId }) => {
+    async ({ quoteId, targetAddress }) => {
       const stored = quoteStore.get(quoteId)
       if (!stored) {
         return errorResult(`Quote "${quoteId}" not found. It may have been used already or never existed.`)
@@ -443,7 +447,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
       quoteStore.delete(quoteId)
 
       try {
-        const result = await sdk.executeSwap(stored.quote, wallet)
+        const result = await sdk.executeSwap(stored.quote, wallet, undefined, targetAddress as `0x${string}` | undefined)
         return jsonResult({
           status: 'completed',
           steps: result.steps,

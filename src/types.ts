@@ -66,8 +66,8 @@ export interface EvmWalletAdapter {
 export interface QuoteRequest {
   /** Source chain ID (1=Ethereum, 137=Polygon, 10=Optimism, 42161=Arbitrum, 8453=Base) */
   sourceChain: SupportedChainId
-  /** Gnosis address to receive xBZZ and/or xDAI */
-  targetAddress: `0x${string}`
+  /** Gnosis address to receive xBZZ and/or xDAI. Optional for quotes — required at execution time. */
+  targetAddress?: `0x${string}`
   /** Amount of xBZZ to deliver (in whole BZZ units, e.g. 10 = 10 BZZ). Defaults to 0. Must be >= 0. */
   bzzAmount?: number
   /** Amount of xDAI to deliver (in whole DAI units, e.g. 0.5 = 0.5 xDAI). Defaults to 0. Must be >= 0. */
@@ -90,6 +90,8 @@ export interface QuoteRequest {
  * A 10% slippage buffer is included in the bridge amount.
  */
 export interface SwapRequest extends QuoteRequest {
+  /** Gnosis address to receive xBZZ and/or xDAI (required for execution) */
+  targetAddress: `0x${string}`
   /** Wallet adapter providing the source funds */
   wallet: EvmWalletAdapter
 }
