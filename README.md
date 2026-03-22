@@ -219,17 +219,21 @@ When creating postage batches, `batchDepth` determines storage capacity:
 | 23 | ~19.8 GB |
 | 24 | ~46.7 GB |
 
-`batchDurationDays` determines how long the batch remains valid. Cost scales linearly with duration and exponentially with depth.
+`batchDurationDays` determines how long the batch remains valid. Fractional values are supported (e.g. `1.5` for 36 hours). Cost scales linearly with duration and exponentially with depth.
 
 ## Fund Recovery
 
-If a swap fails mid-execution, the result includes the `temporaryPrivateKey` for the ephemeral Gnosis wallet. Use this to recover any bridged funds:
+If a swap fails mid-execution, funds may be stuck in the ephemeral Gnosis wallet used during the bridge.
+
+**SDK usage:** The result includes `temporaryPrivateKey` and `temporaryAddress` for the ephemeral wallet:
 
 ```typescript
 const result = await sdk.swap(request)
 // If flow failed, result.temporaryPrivateKey contains the key
 // for the temporary wallet that received bridged xDAI
 ```
+
+**MCP usage:** Private keys are stored server-side and never returned in tool responses. Use the `multichain_list_recovery_wallets` tool to access recovery info for failed operations in the current session.
 
 ## MCP Server
 

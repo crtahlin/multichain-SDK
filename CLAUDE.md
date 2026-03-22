@@ -80,8 +80,8 @@ src/
     Mocked*.ts          # Mocked variants for testing (no real blockchain txs)
 
   mcp/
-    server.ts           # MCP server: createMcpServer() with 10 tools
-    cli.ts              # CLI entry point: node dist/mcp/cli.js (stdio transport)
+    server.ts           # MCP server: createMcpServer() with 11 tools (inline definitions)
+    cli.ts              # CLI entry point: node dist/mcp/cli.js (stdio transport, console→stderr redirect)
 ```
 
 ## Key Concepts
