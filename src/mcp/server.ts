@@ -120,10 +120,20 @@ const chainIdSchema = z.union([z.number(), z.string()]).describe(
   'Chain ID (e.g. 8453) or name (e.g. "base", "ethereum", "polygon", "optimism", "arbitrum").'
 )
 
+/** Retry an async function once after a 1-second delay on failure */
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch {
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    return fn()
+  }
+}
+
 async function getNativeBalance(address: `0x${string}`, chainId: SupportedChainId): Promise<{ balance: string; symbol: string }> {
   const chain = SUPPORTED_CHAINS[chainId]
   const client = createPublicClient({ chain, transport: http(DEFAULT_RPC_URLS[chainId]) })
-  const balance = await client.getBalance({ address })
+  const balance = await withRetry(() => client.getBalance({ address }))
   return {
     balance: formatUnits(balance, chain.nativeCurrency.decimals),
     symbol: chain.nativeCurrency.symbol,
@@ -148,12 +158,12 @@ async function getTokenBalance(
 ): Promise<string> {
   const chain = SUPPORTED_CHAINS[chainId]
   const client = createPublicClient({ chain, transport: http(DEFAULT_RPC_URLS[chainId]) })
-  const balance = await client.readContract({
+  const balance = await withRetry(() => client.readContract({
     address: tokenAddress,
     abi: ERC20_BALANCE_OF_ABI,
     functionName: 'balanceOf',
     args: [address],
-  })
+  }))
   return formatUnits(balance, decimals)
 }
 
