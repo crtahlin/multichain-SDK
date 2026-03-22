@@ -215,7 +215,7 @@ Ethereum (1), Polygon (137), Optimism (10), Arbitrum (42161), Base (8453). Desti
 | Tool | Description | Wallet needed? |
 |---|---|---|
 | `multichain_wallet_status` | Check funding wallet configuration and balance | No |
-| `multichain_wallet_balance` | Check balances across all supported chains | PRIVATE_KEY only |
+| `multichain_wallet_balance` | Check native + ERC-20 balances across all chains (optional `token` param) | PRIVATE_KEY only |
 | `multichain_get_supported_chains` | List supported source chains | No |
 | `multichain_get_supported_tokens` | List tokens on a source chain | No |
 | `multichain_get_bzz_price` | BZZ/USD price | No |
