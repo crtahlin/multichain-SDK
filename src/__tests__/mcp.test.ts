@@ -59,9 +59,9 @@ describe('MCP Server', () => {
   })
 
   describe('tool listing', () => {
-    it('lists all 10 tools', async () => {
+    it('lists all 11 tools', async () => {
       const result = await client.listTools()
-      expect(result.tools).toHaveLength(10)
+      expect(result.tools).toHaveLength(11)
     })
 
     it('includes all expected tool names', async () => {
@@ -77,6 +77,7 @@ describe('MCP Server', () => {
       expect(names).toContain('multichain_execute_swap')
       expect(names).toContain('multichain_swap')
       expect(names).toContain('multichain_create_batch')
+      expect(names).toContain('multichain_list_recovery_wallets')
     })
   })
 
@@ -440,6 +441,16 @@ describe('MCP Server', () => {
       expect(data.error).toContain('NOT')
 
       if (originalKey) process.env.PRIVATE_KEY = originalKey
+    })
+  })
+
+  describe('recovery wallets', () => {
+    it('multichain_list_recovery_wallets returns empty list initially', async () => {
+      const result = await client.callTool({ name: 'multichain_list_recovery_wallets' })
+      const content = result.content as Array<{ type: string; text: string }>
+      const data = JSON.parse(content[0].text)
+      expect(data.wallets).toEqual([])
+      expect(data.message).toContain('No recovery wallets')
     })
   })
 

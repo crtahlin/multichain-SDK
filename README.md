@@ -270,6 +270,7 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 | `multichain_execute_swap` | Execute from quoteId (accepts targetAddress if not in quote) | Yes |
 | `multichain_swap` | Fund Bee node (one step) | Yes |
 | `multichain_create_batch` | Rent Swarm storage | Yes |
+| `multichain_list_recovery_wallets` | List temporary wallets for fund recovery (if swap failed mid-execution) | No |
 
 Tools marked "Wallet needed" require `PRIVATE_KEY` environment variable. `SOURCE_CHAIN` is optional — if not set, specify the chain in each tool call.
 
