@@ -65,12 +65,13 @@ export interface StampCost {
  * Total BZZ cost: `2^depth * amount` (in 16-decimal fixed point).
  *
  * @param depth - Batch depth (17–24). Higher = more storage capacity.
- * @param days - Batch duration in days.
+ * @param days - Batch duration in days. Fractional values are supported (e.g. 1.5 for 36 hours).
  * @param storagePrice - Current storage price from `sdk.getStoragePrice()`.
  * @returns The BZZ cost and per-chunk amount for the postage stamp contract.
  */
 export function getStampCost(depth: number, days: number, storagePrice: bigint): StampCost {
-  const amount = (BigInt(days * 86_400) / BigInt(5)) * storagePrice + 1n
+  const totalSeconds = Math.ceil(days * 86_400)
+  const amount = (BigInt(totalSeconds) / 5n) * storagePrice + 1n
   return {
     bzz: new FixedPointNumber(2n ** BigInt(depth) * BigInt(amount), 16),
     amount,
