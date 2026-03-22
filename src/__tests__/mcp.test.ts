@@ -184,7 +184,7 @@ describe('MCP Server', () => {
       const originalKey = process.env.PRIVATE_KEY
       delete process.env.PRIVATE_KEY
 
-      const result = await client.callTool({ name: 'multichain_wallet_balance' })
+      const result = await client.callTool({ name: 'multichain_wallet_balance', arguments: {} })
       expect(result.isError).toBe(true)
       const content = result.content as Array<{ type: string; text: string }>
       const data = JSON.parse(content[0].text)
@@ -193,22 +193,31 @@ describe('MCP Server', () => {
       if (originalKey) process.env.PRIVATE_KEY = originalKey
     })
 
-    it('returns balances for all 5 chains with valid PRIVATE_KEY', async () => {
+    it('returns native + token balances for all 5 chains', async () => {
       const originalKey = process.env.PRIVATE_KEY
       const originalChain = process.env.SOURCE_CHAIN
       process.env.PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
       process.env.SOURCE_CHAIN = '8453'
 
-      const result = await client.callTool({ name: 'multichain_wallet_balance' })
+      const result = await client.callTool({ name: 'multichain_wallet_balance', arguments: {} })
       const content = result.content as Array<{ type: string; text: string }>
       const data = JSON.parse(content[0].text)
       expect(data.fundingAddress).toMatch(/^0x/)
       expect(data.balances).toHaveLength(5)
-      // Each entry should have chainId and chainName
       for (const entry of data.balances) {
         expect(entry.chainId).toBeDefined()
         expect(entry.chainName).toBeDefined()
         expect(typeof entry.isConfiguredChain).toBe('boolean')
+        // Should have native balance fields
+        expect('nativeBalance' in entry || 'nativeError' in entry).toBe(true)
+        expect(entry.nativeSymbol).toBeDefined()
+        // Should have token balances (common tokens)
+        if (entry.tokens) {
+          for (const tok of entry.tokens) {
+            expect(tok.symbol).toBeDefined()
+            expect(tok.address).toBeDefined()
+          }
+        }
       }
       // The configured chain should be marked
       const configuredEntry = data.balances.find((b: { isConfiguredChain: boolean }) => b.isConfiguredChain)
@@ -219,7 +228,50 @@ describe('MCP Server', () => {
       else delete process.env.PRIVATE_KEY
       if (originalChain) process.env.SOURCE_CHAIN = originalChain
       else delete process.env.SOURCE_CHAIN
-    }, 30000)
+    }, 60000)
+
+    it('accepts token symbol to check specific token', async () => {
+      const originalKey = process.env.PRIVATE_KEY
+      const originalChain = process.env.SOURCE_CHAIN
+      process.env.PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+      process.env.SOURCE_CHAIN = '8453'
+
+      const result = await client.callTool({
+        name: 'multichain_wallet_balance',
+        arguments: { token: 'USDC' },
+      })
+      const content = result.content as Array<{ type: string; text: string }>
+      const data = JSON.parse(content[0].text)
+      expect(data.fundingAddress).toMatch(/^0x/)
+      expect(data.balances).toHaveLength(5)
+      // At least some chains should have a USDC token entry
+      const chainsWithUsdc = data.balances.filter((b: { tokens?: Array<{ symbol: string }> }) =>
+        b.tokens?.some((t: { symbol: string }) => t.symbol === 'USDC')
+      )
+      expect(chainsWithUsdc.length).toBeGreaterThan(0)
+
+      if (originalKey) process.env.PRIVATE_KEY = originalKey
+      else delete process.env.PRIVATE_KEY
+      if (originalChain) process.env.SOURCE_CHAIN = originalChain
+      else delete process.env.SOURCE_CHAIN
+    }, 60000)
+
+    it('returns error for unknown token', async () => {
+      const originalKey = process.env.PRIVATE_KEY
+      process.env.PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+
+      const result = await client.callTool({
+        name: 'multichain_wallet_balance',
+        arguments: { token: 'NONEXISTENTTOKEN' },
+      })
+      expect(result.isError).toBe(true)
+      const content = result.content as Array<{ type: string; text: string }>
+      const data = JSON.parse(content[0].text)
+      expect(data.error).toContain('not found')
+
+      if (originalKey) process.env.PRIVATE_KEY = originalKey
+      else delete process.env.PRIVATE_KEY
+    }, 60000)
 
     it('works without SOURCE_CHAIN (no chain marked as configured)', async () => {
       const originalKey = process.env.PRIVATE_KEY
@@ -227,7 +279,7 @@ describe('MCP Server', () => {
       process.env.PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
       delete process.env.SOURCE_CHAIN
 
-      const result = await client.callTool({ name: 'multichain_wallet_balance' })
+      const result = await client.callTool({ name: 'multichain_wallet_balance', arguments: {} })
       const content = result.content as Array<{ type: string; text: string }>
       const data = JSON.parse(content[0].text)
       expect(data.balances).toHaveLength(5)
@@ -238,7 +290,7 @@ describe('MCP Server', () => {
       if (originalKey) process.env.PRIVATE_KEY = originalKey
       else delete process.env.PRIVATE_KEY
       if (originalChain) process.env.SOURCE_CHAIN = originalChain
-    }, 30000)
+    }, 60000)
   })
 
   describe('read-only tools (no wallet needed)', () => {
