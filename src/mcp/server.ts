@@ -15,6 +15,15 @@ interface StoredQuote {
   expiresAt: number
 }
 
+interface RecoveryEntry {
+  temporaryAddress: `0x${string}`
+  temporaryPrivateKey: `0x${string}`
+  createdAt: string
+  operation: 'swap' | 'batch'
+  sourceChain: number
+  targetAddress?: string
+}
+
 const WALLET_SETUP_INSTRUCTIONS = `\
 No funding wallet configured. A funding wallet is needed to pay for cross-chain swaps.
 
@@ -120,10 +129,20 @@ const chainIdSchema = z.union([z.number(), z.string()]).describe(
   'Chain ID (e.g. 8453) or name (e.g. "base", "ethereum", "polygon", "optimism", "arbitrum").'
 )
 
+/** Retry an async function once after a 1-second delay on failure */
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch {
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    return fn()
+  }
+}
+
 async function getNativeBalance(address: `0x${string}`, chainId: SupportedChainId): Promise<{ balance: string; symbol: string }> {
   const chain = SUPPORTED_CHAINS[chainId]
   const client = createPublicClient({ chain, transport: http(DEFAULT_RPC_URLS[chainId]) })
-  const balance = await client.getBalance({ address })
+  const balance = await withRetry(() => client.getBalance({ address }))
   return {
     balance: formatUnits(balance, chain.nativeCurrency.decimals),
     symbol: chain.nativeCurrency.symbol,
@@ -148,12 +167,12 @@ async function getTokenBalance(
 ): Promise<string> {
   const chain = SUPPORTED_CHAINS[chainId]
   const client = createPublicClient({ chain, transport: http(DEFAULT_RPC_URLS[chainId]) })
-  const balance = await client.readContract({
+  const balance = await withRetry(() => client.readContract({
     address: tokenAddress,
     abi: ERC20_BALANCE_OF_ABI,
     functionName: 'balanceOf',
     args: [address],
-  })
+  }))
   return formatUnits(balance, decimals)
 }
 
@@ -183,6 +202,7 @@ const COMMON_TOKENS: Record<SupportedChainId, Array<{ address: `0x${string}`; sy
 export function createMcpServer(): McpServer {
   const sdk = new MultichainSDK()
   const quoteStore = new Map<string, StoredQuote>()
+  const recoveryStore = new Map<string, RecoveryEntry>()
 
   const server = new McpServer(
     { name: 'multichain-sdk', version: '0.1.0' },
@@ -642,11 +662,20 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
 
       try {
         const result = await sdk.executeSwap(stored.quote, wallet, undefined, targetAddress as `0x${string}` | undefined)
+        recoveryStore.set(result.temporaryAddress, {
+          temporaryAddress: result.temporaryAddress,
+          temporaryPrivateKey: result.temporaryPrivateKey,
+          createdAt: new Date().toISOString(),
+          operation: 'swap',
+          sourceChain: stored.quote.request.sourceChain,
+          targetAddress: (targetAddress ?? stored.quote.request.targetAddress) as string | undefined,
+        })
         return jsonResult({
           status: 'completed',
           steps: result.steps,
           metadata: result.metadata,
-          temporaryPrivateKey: result.temporaryPrivateKey,
+          temporaryAddress: result.temporaryAddress,
+          recoveryNote: 'If the swap failed mid-execution, use multichain_list_recovery_wallets to access recovery info.',
         })
       } catch (error: unknown) {
         return errorResult(error instanceof Error ? error.message : String(error))
@@ -694,11 +723,20 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
           nativeAmount,
           sourceToken: sourceToken as `0x${string}` | undefined,
         })
+        recoveryStore.set(result.temporaryAddress, {
+          temporaryAddress: result.temporaryAddress,
+          temporaryPrivateKey: result.temporaryPrivateKey,
+          createdAt: new Date().toISOString(),
+          operation: 'swap',
+          sourceChain: resolvedChain,
+          targetAddress: targetAddress as string,
+        })
         return jsonResult({
           status: 'completed',
           steps: result.steps,
           metadata: result.metadata,
-          temporaryPrivateKey: result.temporaryPrivateKey,
+          temporaryAddress: result.temporaryAddress,
+          recoveryNote: 'If the swap failed mid-execution, use multichain_list_recovery_wallets to access recovery info.',
         })
       } catch (error: unknown) {
         return errorResult(error instanceof Error ? error.message : String(error))
@@ -747,17 +785,61 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
           batchDurationDays,
           nativeAmount,
         })
+        recoveryStore.set(result.temporaryAddress, {
+          temporaryAddress: result.temporaryAddress,
+          temporaryPrivateKey: result.temporaryPrivateKey,
+          createdAt: new Date().toISOString(),
+          operation: 'batch',
+          sourceChain: resolvedChain,
+          targetAddress: targetAddress as string,
+        })
         return jsonResult({
           status: 'completed',
           batchId: result.batchId,
           blockNumber: result.blockNumber,
           steps: result.steps,
           metadata: result.metadata,
-          temporaryPrivateKey: result.temporaryPrivateKey,
+          temporaryAddress: result.temporaryAddress,
+          recoveryNote: 'If the operation failed mid-execution, use multichain_list_recovery_wallets to access recovery info.',
         })
       } catch (error: unknown) {
         return errorResult(error instanceof Error ? error.message : String(error))
       }
+    },
+  )
+
+  // 10. multichain_list_recovery_wallets
+  server.registerTool(
+    'multichain_list_recovery_wallets',
+    {
+      title: 'List Recovery Wallets',
+      description:
+        'List temporary wallets from previous swap/batch operations in this session. ' +
+        'If a swap failed mid-execution, funds may be stuck in a temporary wallet on Gnosis chain. ' +
+        'This tool reveals the private keys needed to recover those funds. ' +
+        'WARNING: Private keys are sensitive — do not share them or log them unnecessarily.',
+    },
+    async () => {
+      if (recoveryStore.size === 0) {
+        return jsonResult({
+          wallets: [],
+          message: 'No recovery wallets from this session. Recovery info is only available for swaps executed in the current MCP server session.',
+        })
+      }
+
+      const wallets = Array.from(recoveryStore.values()).map(entry => ({
+        temporaryAddress: entry.temporaryAddress,
+        temporaryPrivateKey: entry.temporaryPrivateKey,
+        createdAt: entry.createdAt,
+        operation: entry.operation,
+        sourceChain: entry.sourceChain,
+        targetAddress: entry.targetAddress ?? null,
+      }))
+
+      return jsonResult({
+        wallets,
+        warning: 'These private keys control temporary wallets that may hold funds. Keep them secure and do not share them.',
+      })
     },
   )
 

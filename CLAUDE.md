@@ -224,6 +224,7 @@ Ethereum (1), Polygon (137), Optimism (10), Arbitrum (42161), Base (8453). Desti
 | `multichain_execute_swap` | Execute from quoteId (accepts targetAddress) | Yes |
 | `multichain_swap` | Fund Bee node (one step) | Yes |
 | `multichain_create_batch` | Rent Swarm storage | Yes |
+| `multichain_list_recovery_wallets` | List temporary wallets for fund recovery | No |
 
 All tools accepting `sourceChain` or `chainId` accept both numeric IDs (8453) and names ("base", "ethereum", "polygon", "optimism", "arbitrum"). `targetAddress` is optional for `multichain_get_quote` — provide it later via `multichain_execute_swap`.
 
