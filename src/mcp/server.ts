@@ -548,7 +548,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
         'Cost scales linearly with duration and exponentially with capacity.',
       inputSchema: {
         depth: z.number().int().min(17).max(24).describe('Storage capacity level (17-24). 20 (~682 MB) is recommended for most use cases.'),
-        days: z.number().positive().describe('How many days the storage should last.'),
+        days: z.number().positive().describe('How many days the storage should last. Fractional values supported (e.g. 1.5 for 36 hours).'),
       },
     },
     async ({ depth, days }) => {
@@ -760,7 +760,7 @@ In programmatic setups (LangChain, CrewAI, Vercel AI SDK, etc.), environment var
         sourceChain: chainIdSchema,
         targetAddress: z.string().describe('Bee node\'s Gnosis address (0x...) to receive remaining xDAI. Find via Bee API or swarm_mcp.'),
         batchDepth: z.number().int().min(17).max(24).describe('Storage capacity level (17-24). 20 (~682 MB) is recommended for most use cases.'),
-        batchDurationDays: z.number().positive().describe('How many days the storage should last.'),
+        batchDurationDays: z.number().positive().describe('How many days the storage should last. Fractional values supported (e.g. 1.5 for 36 hours).'),
         nativeAmount: z.number().optional().describe('Extra xDAI (for transaction fees) to deliver alongside the batch. Defaults to 0.'),
       },
     },

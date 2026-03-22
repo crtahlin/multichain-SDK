@@ -67,5 +67,23 @@ describe('Config', () => {
       const result = getStampCost(17, 0, 24000n)
       expect(result.amount).toBe(1n)
     })
+
+    it('handles fractional days (e.g. 25 hours = 1.041667 days)', () => {
+      const storagePrice = 24000n
+      // 1.041667 days = 90000.0288 seconds → ceil to 90001 seconds
+      const result = getStampCost(20, 1.041667, storagePrice)
+      const expectedSeconds = Math.ceil(1.041667 * 86_400) // 90001
+      const expectedAmount = (BigInt(expectedSeconds) / 5n) * storagePrice + 1n
+      expect(result.amount).toBe(expectedAmount)
+      expect(result.bzz.value).toBe(2n ** 20n * expectedAmount)
+    })
+
+    it('handles fractional days like 1.5 (36 hours)', () => {
+      const storagePrice = 24000n
+      const result = getStampCost(20, 1.5, storagePrice)
+      const expectedSeconds = Math.ceil(1.5 * 86_400) // 129600 (exact)
+      const expectedAmount = (BigInt(expectedSeconds) / 5n) * storagePrice + 1n
+      expect(result.amount).toBe(expectedAmount)
+    })
   })
 })
