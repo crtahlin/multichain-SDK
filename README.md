@@ -325,6 +325,18 @@ pnpm test         # Run tests (vitest)
 Agent wallets (Coinbase AgentKit, Turnkey, raw keys, etc.)
 ```
 
+## Acknowledgements
+
+This SDK is based on and adapted from work by the [Ethersphere](https://github.com/ethersphere) team:
+
+- **[multichain-widget](https://github.com/ethersphere/multichain-widget)** — The original React UI for cross-chain swaps to Gnosis. The SDK's step orchestration logic (`src/steps/`) was adapted from the widget's step implementations, with React/browser dependencies replaced by plain Node.js callbacks. The batch cost calculation (`getStampCost`) also originates from the widget's `Utility.ts`.
+
+- **[multichain-library](https://github.com/ethersphere/multichain-library)** — Published as `@upcoming/multichain-library`. Provides the low-level Gnosis chain primitives (balances, SushiSwap, transfers, batch creation, price feeds) that both the widget and this SDK depend on.
+
+The widget and SDK are siblings — they share the same dependency (`multichain-library`) but serve different audiences: the widget targets browser users, while this SDK targets AI agents and headless Node.js environments.
+
 ## License
 
-MIT
+ISC — see [LICENSE](LICENSE).
+
+This project uses the same license as its upstream dependencies ([multichain-widget](https://github.com/ethersphere/multichain-widget) and [multichain-library](https://github.com/ethersphere/multichain-library), both ISC).
